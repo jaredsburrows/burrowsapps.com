@@ -3,11 +3,11 @@
 
 @font-face {
   font-family: "landyicons";
-  src:url("../ba-icons/landyicons.eot");
-  src:url("../ba-icons/landyicons.eot?#iefix") format("embedded-opentype"),
-    url("../ba-icons/landyicons.ttf") format("truetype"),
-    url("../ba-icons/landyicons.svg#landyicons") format("svg"),
-    url("../ba-icons/landyicons.woff") format("woff");
+  src:url("../icons/landyicons.eot");
+  src:url("../icons/landyicons.eot?#iefix") format("embedded-opentype"),
+    url("../icons/landyicons.ttf") format("truetype"),
+    url("../icons/landyicons.svg#landyicons") format("svg"),
+    url("../icons/landyicons.woff") format("woff");
   font-weight: normal;
   font-style: normal;
 

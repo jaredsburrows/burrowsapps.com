@@ -1,0 +1,18 @@
+url: "http://burrowsapps.com"
+
+highlighter: rouge
+permalink: /:title/
+markdown: kramdown
+
+future: true
+
+gems:
+  - jekyll-feed
+  - jekyll-redirect-from
+
+collections:
+  presentations:
+    output: true
+    permalink: /:title/
+
+exclude: [vendor]
