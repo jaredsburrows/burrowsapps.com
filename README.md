@@ -5,3 +5,15 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/jaredsburrows.svg?style=social)](https://twitter.com/jaredsburrows)
 
 BurrowsApps website
+
+### Install dependencies
+
+    $ bundle install
+
+### Update dependencies
+
+    $ bundle update
+
+### Preview the website
+
+    $ bundle exec jekyll serve
