@@ -1,0 +1,37 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  jekyll:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.rvm
+          key: ${{ runner.os }}-bundler
+          restore-keys: ${{ runner.os }}-bundler
+
+      - name: Checkout Project
+        uses: actions/checkout@v2
+
+      - name: Set RUBY_VERSION
+        run: echo "::set-output name=RUBY_VERSION::$(cat .ruby-version)"
+        id: rbenv
+
+      - name: Setup Ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: "${{ steps.rbenv.outputs.RUBY_VERSION }}"
+
+      - name: Setup Bundler
+        run: gem install bundler
+
+      - name: Install Dependencies
+        run: bundle install
+
+      - name: Build the Project
+        run: bundle exec jekyll build
