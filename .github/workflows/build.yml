@@ -3,7 +3,7 @@ name: build
 on:
   push:
     branches:
-      - master
+      - gh-pages
   pull_request:
     types: [ opened, labeled, unlabeled, synchronize ]
 
