@@ -1,4 +1,4 @@
-url: "http://burrowsapps.com"
+url: "https://burrowsapps.com"
 
 highlighter: rouge
 permalink: /:title/
@@ -6,7 +6,7 @@ markdown: kramdown
 
 future: true
 
-gems:
+plugins:
   - jekyll-feed
   - jekyll-redirect-from
 
@@ -15,4 +15,17 @@ collections:
     output: true
     permalink: /:title/
 
-exclude: [vendor]
+include:
+  - '.well-known'
+
+exclude:
+  - 'node_modules'
+  - 'scripts'
+  - 'vendor'
+  - Gemfile
+  - Gemfile.lock
+  - package.json
+  - package-lock.json
+  - README.md
+  - LICENSE.txt
+  - CNAME
