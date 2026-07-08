@@ -44,7 +44,6 @@
     input.closest('.field').classList.toggle('invalid', Boolean(message));
     input.setAttribute('aria-invalid', message ? 'true' : 'false');
     error.textContent = message;
-    error.hidden = !message;
   };
 
   const validate = () => {

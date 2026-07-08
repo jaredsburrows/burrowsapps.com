@@ -346,7 +346,7 @@ a { color: inherit; }
   min-width: 0;
 }
 
-.field-row + .field { margin-top: 18px; }
+.field-row + .field { margin-top: 0; }
 
 .field label {
   font-family: var(--mono), monospace;
@@ -375,8 +375,10 @@ a { color: inherit; }
   border-color: var(--accent);
 }
 
+/* Always occupies one line so errors appearing/clearing never shift the layout. */
 .field-error {
   margin: 0;
+  min-height: 1.4em;
   font-size: 13px;
   line-height: 1.4;
   color: #a33b2e;
@@ -401,7 +403,7 @@ a { color: inherit; }
 }
 
 .form-card button {
-  margin-top: 20px;
+  margin-top: 10px;
   width: 100%;
   background: var(--ink);
   color: var(--bg);
