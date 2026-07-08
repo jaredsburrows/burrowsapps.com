@@ -1,18 +1,16 @@
 (() => {
   'use strict';
 
-  // Example-name placeholder — picked fresh on every page load.
   const nameInput = document.getElementById('cf-name');
   if (nameInput) {
     nameInput.placeholder = Math.random() < 0.5 ? 'John Doe' : 'Jane Doe';
   }
 
-  // Contact form — posts JSON to the Cloudflare Worker.
-  // Keep in sync with the <form action> in index.html (the no-JS fallback).
-  const ENDPOINT = 'https://contact-form.jaredsburrows.workers.dev/';
-
   const form = document.getElementById('contact-form');
   if (!form) return;
+
+  // Single source of truth: the <form action> in index.html (also the no-JS fallback).
+  const ENDPOINT = form.action;
   const submit = document.getElementById('cf-submit');
   const status = document.getElementById('cf-status');
 
@@ -93,7 +91,7 @@
     } else {
       setStatus('error',
         'Something went wrong. Email <a href="mailto:contact@burrowsapps.com">contact@burrowsapps.com</a> '
-        + 'or reach out on <a href="https://www.linkedin.com/company/burrows-applications" target="_blank" rel="noopener">LinkedIn</a>.');
+        + 'or reach out on <a href="https://linkedin.com/company/burrows-applications" target="_blank" rel="noopener">LinkedIn</a>.');
     }
     submit.disabled = false;
     submit.textContent = 'Send message';
