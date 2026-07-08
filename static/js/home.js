@@ -32,29 +32,28 @@
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
 
-    try {
-      const response = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.name.value.trim(),
-          email: form.email.value.trim(),
-          message: form.message.value.trim(),
-          company: form.company.value,
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name.value.trim(),
+        email: form.email.value.trim(),
+        message: form.message.value.trim(),
+        company: form.company.value,
+      }),
+      signal: controller.signal,
+    }).catch(() => null);
+
+    clearTimeout(timer);
+    if (response && response.ok) {
       form.reset();
       setStatus('ok', "Message sent — thanks. I'll get back to you soon.");
-    } catch {
+    } else {
       setStatus('error',
         'Something went wrong. Email <a href="mailto:contact@burrowsapps.com">contact@burrowsapps.com</a> '
         + 'or reach out on <a href="https://www.linkedin.com/company/burrows-applications" target="_blank" rel="noopener">LinkedIn</a>.');
-    } finally {
-      clearTimeout(timer);
-      submit.disabled = false;
-      submit.textContent = 'Send message';
     }
+    submit.disabled = false;
+    submit.textContent = 'Send message';
   });
 })();
