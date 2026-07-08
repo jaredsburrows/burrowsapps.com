@@ -375,6 +375,18 @@ a { color: inherit; }
   border-color: var(--accent);
 }
 
+.field-error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #a33b2e;
+}
+
+.field.invalid input,
+.field.invalid textarea {
+  border-color: #a33b2e;
+}
+
 .field input::placeholder,
 .field textarea::placeholder {
   color: var(--faint);

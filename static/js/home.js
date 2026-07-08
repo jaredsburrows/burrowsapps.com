@@ -21,9 +21,52 @@
     status.innerHTML = html;
   };
 
+  // Inline per-field errors — JS takes over from the native bubbles;
+  // without JS the `required` attributes still guard the POST fallback.
+  form.noValidate = true;
+
+  const FIELDS = ['name', 'email', 'message'];
+
+  const messageFor = (input) => {
+    if (input.validity.valueMissing) {
+      if (input.name === 'name') return 'Please enter your name.';
+      if (input.name === 'email') return 'Please enter your email address.';
+      return 'Please enter a message.';
+    }
+    if (input.validity.typeMismatch || input.validity.patternMismatch) {
+      return 'Please enter a valid email address.';
+    }
+    return input.validationMessage;
+  };
+
+  const setFieldError = (input, message) => {
+    const error = document.getElementById(`${input.id}-error`);
+    input.closest('.field').classList.toggle('invalid', Boolean(message));
+    input.setAttribute('aria-invalid', message ? 'true' : 'false');
+    error.textContent = message;
+    error.hidden = !message;
+  };
+
+  const validate = () => {
+    let firstInvalid = null;
+    for (const name of FIELDS) {
+      const input = form.elements[name];
+      const message = input.validity.valid ? '' : messageFor(input);
+      setFieldError(input, message);
+      if (message && !firstInvalid) firstInvalid = input;
+    }
+    if (firstInvalid) firstInvalid.focus();
+    return !firstInvalid;
+  };
+
+  for (const name of FIELDS) {
+    const input = form.elements[name];
+    input.addEventListener('input', () => setFieldError(input, ''));
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!form.reportValidity()) return;
+    if (!validate()) return;
 
     submit.disabled = true;
     submit.textContent = 'Sending…';

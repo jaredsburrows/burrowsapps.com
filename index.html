@@ -143,18 +143,22 @@
             <div class="field">
               <label for="cf-name">NAME</label>
               <input id="cf-name" name="name" type="text" placeholder="John Doe"
-                     autocomplete="name" maxlength="200" required>
+                     autocomplete="name" maxlength="200" required aria-describedby="cf-name-error">
+              <p class="field-error" id="cf-name-error" hidden></p>
             </div>
             <div class="field">
               <label for="cf-email">EMAIL</label>
               <input id="cf-email" name="email" type="email" placeholder="you@company.com"
-                     autocomplete="email" maxlength="254" required>
+                     autocomplete="email" maxlength="254" required aria-describedby="cf-email-error"
+                     pattern="[^@\s]+@[^@\s]+\.[^@\s]{2,}" title="Enter an email address like you@company.com">
+              <p class="field-error" id="cf-email-error" hidden></p>
             </div>
           </div>
           <div class="field">
             <label for="cf-message">MESSAGE</label>
             <textarea id="cf-message" name="message" placeholder="Tell me about your project…"
-                      rows="4" maxlength="5000" required></textarea>
+                      rows="4" maxlength="5000" required aria-describedby="cf-message-error"></textarea>
+            <p class="field-error" id="cf-message-error" hidden></p>
           </div>
           <div class="hp" aria-hidden="true">
             <label for="cf-company">Company</label>

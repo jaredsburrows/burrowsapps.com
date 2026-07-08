@@ -1,22 +1,20 @@
 # burrowsapps.com
 
+Burrows Applications website
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 [![Build](https://github.com/jaredsburrows/burrowsapps.com/workflows/build/badge.svg)](https://github.com/jaredsburrows/burrowsapps.com/actions)
 [![Twitter Follow](https://img.shields.io/twitter/follow/jaredsburrows.svg?style=social)](https://twitter.com/jaredsburrows)
 
-Burrows Applications website
-
-### Install dependencies
-
-    $ bundle install
-
-### Update dependencies
-
-    $ bundle update
+Business website — fully static, no build step. GitHub Pages serves the repo as-is (`.nojekyll`).
 
 ### Preview the website
 
-    $ bundle exec jekyll serve
+Open `index.html` in a browser, or serve the directory:
+
+```
+python3 -m http.server
+```
 
 License
 =======
