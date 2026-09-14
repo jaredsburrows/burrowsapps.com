@@ -247,3 +247,9 @@ hs_err_pid*
 !/gradle/wrapper/gradle-wrapper.jar
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,androidstudio,macos
+
+### Cloudflare Wrangler ###
+
+# Local dev state from `wrangler dev --config workers/contact/wrangler.jsonc`.
+# Must stay untracked: this branch is served verbatim by GitHub Pages.
+.wrangler/

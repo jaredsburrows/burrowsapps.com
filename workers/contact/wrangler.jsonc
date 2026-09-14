@@ -1,0 +1,60 @@
+{
+  // Schema is fetched over the network rather than from node_modules/: this is a
+  // GitHub Pages branch served verbatim, with no package manifest and no install
+  // step, so there is no local wrangler to point at.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  // Standalone contact-form Worker for burrowsapps.com — owns the /api/contact
+  // route on the zone (routes take precedence over Pages) and sends via
+  // Cloudflare Email Service. the-cigar-guys/workers/contact is a port of this.
+  //
+  // Deploy: npx wrangler deploy --config workers/contact/wrangler.jsonc
+  // Optional bot check: npx wrangler secret put TURNSTILE_SECRET --config workers/contact/wrangler.jsonc
+  //
+  // Name matches the Worker that already exists on the account, so a deploy
+  // updates it in place. Deploying under any other name would create a second
+  // Worker and leave the live one serving the route.
+  "name": "burrowsapps-contact-form",
+  // Jaredsburrows@gmail.com's account — owns the burrowsapps.com zone.
+  "account_id": "23fd1f78e6c723b48b52bd073092907a",
+  "main": "index.js",
+  // Pinned to what the live Worker already runs, so bringing it under source
+  // control is not also a runtime bump. Raise it deliberately, on its own.
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true },
+  // These routes are what make the form work. Without them /api/contact falls
+  // through to GitHub Pages, which answers a POST with 405 -- the form then
+  // shows its "email me instead" fallback and every message is silently lost.
+  //
+  // www is not redundant: www.burrowsapps.com is served by Pages in its own
+  // right (it does not redirect to the apex), and it is in the Worker's origin
+  // allow-list, so without this route a no-JS post from www would 405.
+  //
+  // NOTE: the Worker was previously bound to the broader `burrowsapps.com/api/*`
+  // via the dashboard. Wrangler only manages routes listed here, so that one
+  // survives a deploy and must be deleted by hand. Until it is, both match and
+  // Cloudflare picks the more specific -- so ordering the cleanup after the
+  // deploy leaves no window where the form is unrouted.
+  //
+  // These take effect only on a deploy of THIS Worker, which the site's CI does
+  // not do: npx wrangler deploy --config workers/contact/wrangler.jsonc
+  "routes": [
+    { "pattern": "burrowsapps.com/api/contact*", "zone_name": "burrowsapps.com" },
+    { "pattern": "www.burrowsapps.com/api/contact*", "zone_name": "burrowsapps.com" }
+  ],
+  // Email Service sending binding, locked to the one inbox it may write to --
+  // matching the binding already on the live Worker.
+  // Requires the domain onboarded: npx wrangler email sending enable burrowsapps.com
+  "send_email": [
+    {
+      "name": "CONTACT",
+      "allowed_destination_addresses": ["burrowsapps+contactform@gmail.com"]
+    }
+  ],
+  // 5/min per IP, 10/min globally -- the limits the live Worker already runs.
+  // namespace_id is per-Worker and arbitrary; these are fresh counters, so the
+  // first deploy resets whatever the dashboard-created bindings had accumulated.
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
+    { "name": "GLOBAL_LIMITER", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
+  ]
+}
