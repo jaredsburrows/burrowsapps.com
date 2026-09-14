@@ -41,4 +41,4 @@ jobs:
         run: java -jar node_modules/vnu-jar/build/dist/vnu.jar index.html 404.html privacy.html
 
       - name: Check JavaScript syntax
-        run: for f in static/js/*.js; do node --check "$f"; done
+        run: for f in static/js/*.js workers/contact/*.js; do node --check "$f"; done
