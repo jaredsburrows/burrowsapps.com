@@ -102,4 +102,62 @@
     if (!validate()) return;
     await send();
   });
+
+  // WebMCP (https://webmachinelearning.github.io/webmcp/): lets an AI agent in
+  // the visitor's browser use this form as a tool. Does nothing where the API is
+  // absent. document.modelContext is the current entry point; older Chrome
+  // builds used navigator.modelContext.
+  const runTool = async (input) => {
+    const values = input && typeof input === 'object' ? input : {};
+    for (const name of FIELDS) {
+      form.elements[name].value = typeof values[name] === 'string' ? values[name] : '';
+    }
+    const valid = validate();
+    const errors = {};
+    for (const name of FIELDS) {
+      const field = form.elements[name];
+      if (!field.validity.valid) {
+        errors[name] = messageFor(field);
+      } else if (field.maxLength > 0 && field.value.length > field.maxLength) {
+        // maxlength is not enforced on values set from script.
+        errors[name] = `Must be at most ${field.maxLength} characters.`;
+        setFieldError(field, errors[name]);
+      }
+    }
+    if (!valid || Object.keys(errors).length > 0) {
+      return { status: 'invalid', message: 'The message was not sent. Fix the listed fields and try again.', errors };
+    }
+    return (await send())
+      ? { status: 'sent', message: 'Message sent. Burrows Applications will reply to the email address provided.' }
+      : { status: 'failed', message: 'The message could not be sent. Email contact@burrowsapps.com instead.' };
+  };
+
+  try {
+    const modelContext = document.modelContext || navigator.modelContext;
+    if (modelContext && typeof modelContext.registerTool === 'function') {
+      const registration = modelContext.registerTool({
+        name: 'send_contact_message',
+        title: 'Send a message to Burrows Applications',
+        description: 'Send a message to Burrows Applications, a mobile and web app development company, '
+          + 'through the contact form on this page. Use it for project inquiries. The message is emailed '
+          + 'to the owner, who replies to the email address provided.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: "The sender's name.", minLength: 1, maxLength: 200 },
+            email: { type: 'string', format: 'email', description: 'Email address the reply should go to.', maxLength: 254 },
+            message: { type: 'string', description: 'What the sender wants to discuss, such as the project and timeline.', minLength: 1, maxLength: 5000 },
+          },
+          required: ['name', 'email', 'message'],
+          additionalProperties: false,
+        },
+        annotations: { readOnlyHint: false, consequentialHint: true },
+        execute: (input) => runTool(input),
+      });
+      // Current spec: registerTool returns a Promise. Older builds return undefined.
+      if (registration && typeof registration.catch === 'function') registration.catch(() => {});
+    }
+  } catch {
+    // An agent API must never break the page for people.
+  }
 })();
