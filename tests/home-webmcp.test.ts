@@ -179,3 +179,112 @@ for (const [label, input, badFields] of INVALID_INPUTS) {
     }
   });
 }
+
+// ---- QA additions: exit paths, button state, and overlapping sends ----
+
+const FAILED_STATUS_START = "Something went wrong. Email ";
+
+for (const behavior of ["not-ok", "reject"] as const) {
+  test(`human submit with fetch ${behavior} shows the error, keeps the values, and restores the button`, async () => {
+    const dom = createFakeDom();
+    dom.run();
+    fillValid(dom);
+    dom.fetchBehavior = behavior;
+    await dom.submitForm();
+    assert.equal(dom.fetchCalls.length, 1);
+    assert.equal(dom.status.className, "form-status error");
+    assert.ok(dom.status.innerHTML.startsWith(FAILED_STATUS_START));
+    assert.equal(dom.form.resets, 0);
+    assert.equal(dom.fields.message.value, VALID.message);
+    assert.equal(dom.submit.disabled, false);
+    assert.equal(dom.submit.textContent, "Send message");
+  });
+}
+
+test("human submit with an invalid form sends nothing, focuses the first bad field, and leaves the button alone", async () => {
+  const dom = createFakeDom();
+  dom.run();
+  dom.fields.name.value = VALID.name;
+  dom.fields.email.value = "nope";
+  await dom.submitForm();
+  assert.equal(dom.fetchCalls.length, 0);
+  assert.equal(dom.fields.email.focused, 1);
+  assert.equal(dom.fields.message.invalid, true);
+  assert.equal(dom.submit.disabled, false);
+  assert.equal(dom.submit.textContent, "Send message");
+  assert.equal(dom.status.innerHTML, "");
+});
+
+test("the button is disabled and reads Sending… while a send is in flight", async () => {
+  const dom = createFakeDom();
+  dom.run();
+  fillValid(dom);
+  let release!: () => void;
+  dom.fetchGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const pending = dom.submitForm();
+  assert.equal(dom.submit.disabled, true);
+  assert.equal(dom.submit.textContent, "Sending…");
+  release();
+  await pending;
+  assert.equal(dom.submit.disabled, false);
+  assert.equal(dom.submit.textContent, "Send message");
+});
+
+for (const behavior of ["ok", "not-ok", "reject"] as const) {
+  test(`execute leaves the button enabled and labeled after fetch ${behavior}`, async () => {
+    const { dom, tool } = registeredTool();
+    dom.fetchBehavior = behavior;
+    await tool.execute({ ...VALID });
+    assert.equal(dom.submit.disabled, false);
+    assert.equal(dom.submit.textContent, "Send message");
+  });
+}
+
+test("execute replaces whatever a human had typed in the form", async () => {
+  // Accepted behavior: the tool drives the visible form, so its values win.
+  const { dom, tool } = registeredTool();
+  dom.fields.name.value = "Typed by a person";
+  dom.fields.message.value = "A half-written draft";
+  await tool.execute({ ...VALID });
+  assert.equal(dom.fetchCalls[0].fields.name, VALID.name);
+  assert.equal(dom.fetchCalls[0].fields.message, VALID.message);
+});
+
+test("execute does not touch the honeypot field", async () => {
+  const { dom, tool } = registeredTool();
+  await tool.execute({ ...VALID, company: "Acme" });
+  assert.equal(JSON.parse(dom.fetchCalls[0].init.body).company, "");
+});
+
+test("execute ignores non-string field values", async () => {
+  const { dom, tool } = registeredTool();
+  const result = plain(await tool.execute({ name: 5, email: ["a@b.co"], message: { x: 1 } }));
+  assert.equal(result.status, "invalid");
+  assert.equal(dom.fetchCalls.length, 0);
+});
+
+// B2: the tool bypasses the disabled button, so a second call, or a call during a
+// human submit, posts a second message.
+test("execute while a send is in flight does not post a second message", { todo: "B2" }, async () => {
+  const { dom, tool } = registeredTool();
+  let release!: () => void;
+  dom.fetchGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const first = tool.execute({ ...VALID });
+  const second = tool.execute({ ...VALID });
+  release();
+  await Promise.all([first, second]);
+  assert.equal(dom.fetchCalls.length, 1);
+});
+
+// B3: whitespace-only values pass validity (valueMissing ignores spaces) and are
+// trimmed to empty by send(), so the server rejects them after the tool said nothing was wrong.
+test("execute with whitespace-only fields reports invalid and sends nothing", { todo: "B3" }, async () => {
+  const { dom, tool } = registeredTool();
+  const result = plain(await tool.execute({ name: "   ", email: VALID.email, message: "\n\n" }));
+  assert.equal(result.status, "invalid");
+  assert.equal(dom.fetchCalls.length, 0);
+});

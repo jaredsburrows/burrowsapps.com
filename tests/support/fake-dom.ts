@@ -63,6 +63,9 @@ export type FakeDom = {
   errors: Record<string, FakeElement>;
   fetchCalls: FetchCall[];
   fetchBehavior: FetchBehavior;
+  // When set, every fetch waits for this promise before it settles, so a test
+  // can keep a send in flight.
+  fetchGate: Promise<void> | null;
   run(): void;
   submitForm(): Promise<void>;
 };
@@ -155,6 +158,7 @@ export function createFakeDom(options: FakeDomOptions = {}): FakeDom {
     errors,
     fetchCalls: [],
     fetchBehavior: "ok",
+    fetchGate: null,
     run() {
       const document: Record<string, unknown> = { getElementById: (id: string) => byId[id] ?? null };
       if ("documentModelContext" in options) document.modelContext = options.documentModelContext;
@@ -166,6 +170,7 @@ export function createFakeDom(options: FakeDomOptions = {}): FakeDom {
           init,
           fields: { name: fields.name.value, email: fields.email.value, message: fields.message.value },
         });
+        if (dom.fetchGate) await dom.fetchGate;
         if (dom.fetchBehavior === "reject") throw new TypeError("Failed to fetch");
         return { ok: dom.fetchBehavior === "ok" };
       };

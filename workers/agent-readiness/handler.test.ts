@@ -252,3 +252,126 @@ test("handle: a failing HTML origin fetch rejects", async () => {
   });
   await assert.rejects(handle(get("https://burrowsapps.com/"), origin.fetch), /origin down/);
 });
+
+// ---- QA additions: inputs the planned cases skip ----
+
+const ODD_ACCEPT_CASES: ReadonlyArray<[string, boolean]> = [
+  [" text/markdown ; q = 0.5 , text/html ; q = 0.4 ", true],
+  ["text/markdown;Q=0", false],
+  ["text/markdown;q=0.5;q=0", false],
+  ["text/markdown;q=0.5, text/markdown;q=0.9, text/html;q=0.8", true],
+  ["text/markdown;q=0.1, text/markdown;q=0.9, text/html;q=0.95", false],
+  ["text/markdown;q=5, text/html;q=1", true],
+  ["text/markdown;q=-1", false],
+  ["text/html;q=7, text/markdown;q=1", true],
+  ["application/xhtml+xml, text/markdown;q=0.9", false],
+  ["text/markdown, text/html;q=0", true],
+  ["text/markdown;q=0.5,text/html;q=0.5", true],
+  [",,, text/markdown", true],
+  ["text/markdownx", false],
+  ["text/markdown/extra", false],
+  ["application/text/markdown", false],
+];
+
+for (const [accept, expected] of ODD_ACCEPT_CASES) {
+  test(`prefersMarkdown(${JSON.stringify(accept)}) is ${expected} (odd forms)`, async () => {
+    assert.equal(prefersMarkdown(accept), expected);
+  });
+}
+
+const NOT_PAGES = [
+  "https://burrowsapps.com//",
+  "https://burrowsapps.com/index.html",
+  "https://burrowsapps.com/PRIVACY.html",
+  "https://burrowsapps.com/privacy.html/",
+  "https://burrowsapps.com/privacy%2Ehtml",
+  "https://burrowsapps.com/index.md",
+];
+
+for (const url of NOT_PAGES) {
+  test(`handle: ${url} is not a page and passes through untouched`, async () => {
+    const upstream = new Response("x", { status: 200, headers: { "Content-Type": "text/html" } });
+    const origin = stubOrigin({ [new URL(url).href]: () => upstream });
+    const response = await handle(get(url, "text/markdown"), origin.fetch);
+    assert.equal(origin.calls.length, 1);
+    assert.equal(response, upstream);
+    assert.equal(response.headers.get("Link"), null);
+  });
+}
+
+test("handle: a trailing-dot host still gets the page treatment and stays on that host", async () => {
+  const origin = stubOrigin({ "https://burrowsapps.com./index.md": markdownFile() });
+  const response = await handle(get("https://burrowsapps.com./", "text/markdown"), origin.fetch);
+  assert.equal(response.headers.get("Content-Type"), "text/markdown; charset=utf-8");
+});
+
+test("handle: HEAD on the HTML branch gets Link and Vary and no body", async () => {
+  const origin = stubOrigin({
+    "https://burrowsapps.com/": () =>
+      new Response(null, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }),
+  });
+  const request = get("https://burrowsapps.com/", BROWSER_ACCEPT, "HEAD");
+  const response = await handle(request, origin.fetch);
+  assert.equal(origin.calls[0], request);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Link"), HOME_LINKS);
+  assert.ok(varyTokens(response).includes("accept"));
+  assert.equal(response.body, null);
+});
+
+test("handle: an origin Link header is kept and the page links are added after it", async () => {
+  const origin = stubOrigin({ "https://burrowsapps.com/": htmlPage(200, { Link: "</x.css>; rel=preload; as=style" }) });
+  const response = await handle(get("https://burrowsapps.com/"), origin.fetch);
+  assert.equal(response.headers.get("Link"), `</x.css>; rel=preload; as=style, ${HOME_LINKS}`);
+});
+
+test("handle: a response from a real fetch (immutable headers) is still decorated", async () => {
+  const { createServer } = await import("node:http");
+  const server = createServer((_request, res) => {
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Vary", "Accept-Encoding");
+    res.end(HTML);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = server.address() as { port: number };
+    const real = await fetch(`http://127.0.0.1:${port}/`);
+    assert.throws(() => real.headers.set("X-Probe", "1"), TypeError);
+    const response = await handle(get("https://burrowsapps.com/"), async () => real);
+    await assertDecoratedHtml(response);
+  } finally {
+    server.close();
+  }
+});
+
+for (const [label, body] of [["only a BOM", "﻿"], ["a BOM and whitespace", "﻿ \n"]] as const) {
+  test(`handle: markdown origin with ${label} falls back to decorated HTML`, async () => {
+    const origin = stubOrigin({
+      "https://burrowsapps.com/index.md": markdownFile(body),
+      "https://burrowsapps.com/": htmlPage(),
+    });
+    await assertDecoratedHtml(await handle(get("https://burrowsapps.com/", "text/markdown"), origin.fetch));
+  });
+}
+
+test("handle: a markdown file with a leading BOM is served without it", async () => {
+  const origin = stubOrigin({ "https://burrowsapps.com/index.md": markdownFile(`﻿${MARKDOWN}`) });
+  const response = await handle(get("https://burrowsapps.com/", "text/markdown"), origin.fetch);
+  assert.equal(await response.text(), MARKDOWN);
+  assert.equal(response.headers.get("X-Markdown-Tokens"), String(estimateTokens(MARKDOWN)));
+});
+
+test("handle: an upper-case text/html markdown content type falls back", async () => {
+  const origin = stubOrigin({
+    "https://burrowsapps.com/index.md": markdownFile(HTML, "TEXT/HTML; charset=UTF-8"),
+    "https://burrowsapps.com/": htmlPage(),
+  });
+  await assertDecoratedHtml(await handle(get("https://burrowsapps.com/", "text/markdown"), origin.fetch));
+});
+
+// B1: Vary "*" must stay alone; "*, Accept" is not a valid Vary field value.
+test("handle: an origin Vary of * is left as *", { todo: "B1" }, async () => {
+  const origin = stubOrigin({ "https://burrowsapps.com/": htmlPage(200, { Vary: "*" }) });
+  const response = await handle(get("https://burrowsapps.com/"), origin.fetch);
+  assert.equal(response.headers.get("Vary"), "*");
+});
