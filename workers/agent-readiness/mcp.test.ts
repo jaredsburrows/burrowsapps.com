@@ -93,7 +93,7 @@ test("modern: tools/list returns the three tools with ttlMs and cacheScope", asy
 const EXPECTED: Record<string, unknown> = {
   get_company_profile: { ...COMPANY },
   list_services: { services: SERVICES },
-  get_contact_options: contactOptions(false),
+  get_contact_options: contactOptions(),
 };
 
 for (const [name, data] of Object.entries(EXPECTED)) {
@@ -338,7 +338,7 @@ test("legacy: a whole session in order", async () => {
 
 test("legacy: tools/call with no prior initialize is served", async () => {
   const call = await legacyResult(await send(legacy("tools/call", { name: "get_contact_options" })));
-  assert.deepEqual(call.structuredContent, contactOptions(false));
+  assert.deepEqual(call.structuredContent, contactOptions());
 });
 
 // Card

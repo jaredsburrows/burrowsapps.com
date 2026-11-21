@@ -26,9 +26,9 @@ Server card: https://burrowsapps.com/mcp/server-card
 
 Tools, all read-only and without arguments: `get_company_profile`, `list_services`, `get_contact_options`.
 
-## Sending a project inquiry (needs a person's approval)
+## No login
 
-`POST /api/v1/inquiries` emails a project inquiry to Burrows Applications. It needs an OAuth access token that a person approves in their browser. The steps are in https://burrowsapps.com/auth.md. If that file returns `404`, the inquiry API is switched off; use the contact form or email instead.
+Nothing here needs a credential, and none is offered. There is no programmatic way to send a message: the contact form's endpoint, `/api/contact`, accepts submissions only from the form on burrowsapps.com.
 
 ## Limits
 

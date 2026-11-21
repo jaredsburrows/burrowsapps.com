@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
-import { COMPANY, CONTACT, INQUIRY_API, SERVICES, contactOptions } from "./facts.ts";
+import { COMPANY, CONTACT, SERVICES, contactOptions } from "./facts.ts";
 
 const REPO = new URL("../../", import.meta.url);
 const read = (path: string): Promise<string> => readFile(new URL(path, REPO), "utf8");
@@ -13,17 +13,12 @@ const strings = (value: unknown): string[] => {
   return [];
 };
 
-const published = [...strings(COMPANY), ...strings(CONTACT), ...strings(INQUIRY_API)].filter(
+const published = [...strings(COMPANY), ...strings(CONTACT)].filter(
   (value) => value.startsWith("https://") || value.includes("@"),
 );
 
-// URLs whose file arrives in a later task.
-const PENDING: Record<string, string> = {
-  "https://burrowsapps.com/auth.md": "auth.md arrives in T33",
-};
-
 for (const value of published) {
-  test(`${value} is in index.md or SKILL.md, or resolves on the site`, { todo: PENDING[value] ?? false }, async () => {
+  test(`${value} is in index.md or SKILL.md, or resolves on the site`, async () => {
     const text = (await read("index.md")) + (await read(".well-known/agent-skills/contact-burrows-applications/SKILL.md"));
     assert.ok(text.includes(value) || resolveSiteUrl(value) !== null, `${value} is not published anywhere`);
   });
@@ -58,8 +53,6 @@ test("the form limits equal the contact Worker's", async () => {
   assert.equal(CONTACT.formFields.message.maxLength, constant("MAX_MESSAGE"));
 });
 
-test("contactOptions names the inquiry API only when the authorization server is on", async () => {
-  assert.equal("inquiryApi" in contactOptions(false), false);
-  assert.deepEqual(contactOptions(true).inquiryApi, INQUIRY_API);
-  assert.equal(contactOptions(true).email, CONTACT.email);
+test("contactOptions is the contact facts and nothing else", async () => {
+  assert.deepEqual(contactOptions(), { ...CONTACT });
 });

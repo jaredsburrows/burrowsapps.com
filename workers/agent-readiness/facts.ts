@@ -26,12 +26,6 @@ export const CONTACT = {
   developers: "https://burrowsapps.com/developers.md",
 } as const;
 
-// Present only while the authorization server is on.
-export const INQUIRY_API = {
-  instructions: "https://burrowsapps.com/auth.md",
-  endpoint: "https://burrowsapps.com/api/v1/inquiries",
-} as const;
-
-export function contactOptions(authOn: boolean): Record<string, unknown> {
-  return authOn ? { ...CONTACT, inquiryApi: INQUIRY_API } : { ...CONTACT };
+export function contactOptions(): Record<string, unknown> {
+  return { ...CONTACT };
 }

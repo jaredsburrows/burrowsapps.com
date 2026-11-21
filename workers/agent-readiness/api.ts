@@ -38,9 +38,9 @@ const getOperation = (operationId: string, summary: string, schema: string) => (
 
 const STRING = { type: "string" } as const;
 
-// The OpenAPI 3.1 description of this API. The inquiry endpoint and its OAuth
-// security scheme appear only while the authorization server is on.
-export function openapi(authOn: boolean): Record<string, unknown> {
+// The OpenAPI 3.1 description of this API. Every operation is a read-only GET
+// that needs no credential.
+export function openapi(): Record<string, unknown> {
   const paths: Record<string, unknown> = {
     "/company": getOperation("getCompany", "Company profile, services, and contact options", "Company"),
     "/services": getOperation("listServices", "The services Burrows Applications offers", "ServiceList"),
@@ -82,7 +82,7 @@ export function openapi(authOn: boolean): Record<string, unknown> {
       properties: { error: STRING, error_description: STRING, fields: { type: "array", items: STRING } },
     },
   };
-  const document: Record<string, unknown> = {
+  return {
     openapi: "3.1.0",
     info: {
       title: "Burrows Applications public API",
@@ -95,50 +95,6 @@ export function openapi(authOn: boolean): Record<string, unknown> {
     paths,
     components: { schemas },
   };
-  if (authOn) {
-    paths["/inquiries"] = {
-      post: {
-        operationId: "submitInquiry",
-        summary: "Email a project inquiry to Burrows Applications",
-        description: "Needs an access token that a person approved in a browser. See https://burrowsapps.com/auth.md.",
-        security: [{ oauth2: ["inquiries:write"] }],
-        requestBody: { required: true, content: jsonContent("Inquiry") },
-        responses: {
-          "202": response("The inquiry was handed to email delivery.", "Accepted"),
-          "400": response("A field is missing or invalid.", "Error"),
-          "401": response("The access token is missing, expired, or invalid.", "Error"),
-          "403": response("The access token lacks the inquiries:write scope.", "Error"),
-          "429": RATE_LIMITED,
-          "502": response("Email delivery failed.", "Error"),
-          "503": response("The service is temporarily unavailable.", "Error"),
-        },
-      },
-    };
-    schemas.Inquiry = {
-      type: "object",
-      required: ["name", "email", "message"],
-      additionalProperties: false,
-      properties: {
-        name: { type: "string", minLength: 1, maxLength: 200 },
-        email: { type: "string", minLength: 1, maxLength: 254, format: "email" },
-        message: { type: "string", minLength: 1, maxLength: 5000 },
-      },
-    };
-    schemas.Accepted = { type: "object", required: ["status"], properties: { status: { const: "accepted" } } };
-    (document.components as Record<string, unknown>).securitySchemes = {
-      oauth2: {
-        type: "oauth2",
-        flows: {
-          authorizationCode: {
-            authorizationUrl: "https://burrowsapps.com/oauth/authorize",
-            tokenUrl: "https://burrowsapps.com/oauth/token",
-            scopes: { "inquiries:write": "Send a project inquiry to Burrows Applications" },
-          },
-        },
-      },
-    };
-  }
-  return document;
 }
 
 // RFC 9727 API catalog in the RFC 9264 linkset format.
@@ -164,13 +120,13 @@ export function catalog(request: Request): Response {
 
 type Body = { body: unknown; contentType?: string; headers?: Record<string, string> };
 
-function bodyFor(pathname: string, deps: Deps, authOn: boolean): Body | null {
+function bodyFor(pathname: string, deps: Deps): Body | null {
   switch (pathname) {
     case "/api/v1":
     case "/api/v1/":
       return { body: INDEX };
     case "/api/v1/company":
-      return { body: { ...COMPANY, services: SERVICES, contact: contactOptions(authOn) } };
+      return { body: { ...COMPANY, services: SERVICES, contact: contactOptions() } };
     case "/api/v1/services":
       return { body: { services: SERVICES } };
     case "/api/v1/status":
@@ -179,15 +135,15 @@ function bodyFor(pathname: string, deps: Deps, authOn: boolean): Body | null {
         headers: { "Cache-Control": "no-store" },
       };
     case "/api/v1/openapi.json":
-      return { body: openapi(authOn), contentType: OPENAPI_TYPE };
+      return { body: openapi(), contentType: OPENAPI_TYPE };
     default:
       return null;
   }
 }
 
-export async function handle(request: Request, env: Env, deps: Deps, url: URL, authOn: boolean): Promise<Response> {
+export async function handle(request: Request, env: Env, deps: Deps, url: URL): Promise<Response> {
   if (!(await allow(env.PUBLIC_LIMITER, clientIp(request), "open"))) return tooMany();
-  const doc = bodyFor(url.pathname, deps, authOn);
+  const doc = bodyFor(url.pathname, deps);
   if (!doc) return json(404, { error: "not_found" });
   return staticDoc(request, JSON.stringify(doc.body), doc.contentType ?? JSON_TYPE, doc.headers);
 }

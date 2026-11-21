@@ -31,8 +31,8 @@ On https://burrowsapps.com/ the page registers a WebMCP tool named `send_contact
 
 ### If you are not in a browser
 
-- To read facts: `GET https://burrowsapps.com/api/v1/company` and `GET https://burrowsapps.com/api/v1/services` return JSON, and the MCP server at https://burrowsapps.com/mcp offers the same facts as tools. Details: https://burrowsapps.com/developers.md
-- To send an inquiry: fetch https://burrowsapps.com/auth.md. If it returns 200, follow it: register, have the user approve in their browser, then send the same three fields to the inquiry API. If it returns 404, the inquiry API is switched off; draft the message with the user and have them send it to contact@burrowsapps.com or through the form.
+- To read facts: `GET https://burrowsapps.com/api/v1/company` and `GET https://burrowsapps.com/api/v1/services` return JSON, and the MCP server at https://burrowsapps.com/mcp offers the same facts as tools. Neither needs a credential. Details: https://burrowsapps.com/developers.md
+- To send a message: there is no programmatic way. Draft the message with the user, then have them send it to contact@burrowsapps.com or through the form.
 - Do not post to `/api/contact`. It accepts submissions only from the form on burrowsapps.com and rejects every other request.
 
 ## What a useful message includes

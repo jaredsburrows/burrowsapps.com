@@ -2,9 +2,9 @@
 // path), decorates the origin's page, or passes it through untouched.
 //
 // Owned paths never fall through to the origin: an internal failure is a 500
-// from here, and passThroughOnException is not armed for them, so a bearer
-// token or a code verifier is never forwarded to GitHub Pages. Everything else
-// keeps the iteration 1 fail-open behavior.
+// from here, and passThroughOnException is not armed for them, so a request
+// meant for the Worker is never answered by GitHub Pages instead. Everything
+// else keeps the iteration 1 fail-open behavior.
 
 import { handle as api, catalog } from "./api.ts";
 import { handle } from "./handler.ts";
@@ -18,7 +18,7 @@ type Handler = (request: Request, env: Env, deps: Deps, url: URL) => Promise<Res
 
 const notFound = async (): Promise<Response> => json(404, { error: "not_found" });
 
-const publicApi: Handler = (request, env, deps, url) => api(request, env, deps, url, false);
+const publicApi: Handler = (request, env, deps, url) => api(request, env, deps, url);
 
 const ROUTES: Readonly<Record<string, Handler>> = {
   "/.well-known/api-catalog": async (request) => catalog(request),
@@ -28,13 +28,13 @@ const ROUTES: Readonly<Record<string, Handler>> = {
   "/api/v1/services": publicApi,
   "/api/v1/status": publicApi,
   "/api/v1/openapi.json": publicApi,
-  "/mcp": (request, env, deps) => mcp(request, env, deps, false),
+  "/mcp": (request, env) => mcp(request, env),
   "/mcp/server-card": async (request, _env, _deps, url) => card(request, url),
   "/.well-known/mcp/server-card.json": async (request, _env, _deps, url) => card(request, url),
 };
 
 export const OWNED_EXACT: readonly string[] = Object.keys(ROUTES);
-export const OWNED_PREFIXES: readonly string[] = ["/api/v1/", "/mcp/", "/oauth/"];
+export const OWNED_PREFIXES: readonly string[] = ["/api/v1/", "/mcp/"];
 
 export function isOwned(pathname: string): boolean {
   return OWNED_EXACT.includes(pathname) || OWNED_PREFIXES.some((prefix) => pathname.startsWith(prefix));

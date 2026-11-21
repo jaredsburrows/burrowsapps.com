@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
 import { API_VERSION, CATALOG, openapi } from "./api.ts";
-import { COMPANY, SERVICES } from "./facts.ts";
+import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
 import { isOwned, route } from "./router.ts";
 import { makeBaseEnv, makeDeps, T0 } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
@@ -82,9 +82,9 @@ test("3. the public limiter is keyed by client IP", async () => {
   assert.deepEqual(env.PUBLIC_LIMITER.keys, ["203.0.113.5"]);
 });
 
-test("6. company contact options have no inquiryApi while the authorization server is off", async () => {
+test("6. company contact options are the contact facts", async () => {
   const company = await (await call("/api/v1/company")).response.json();
-  assert.equal("inquiryApi" in company.contact, false);
+  assert.deepEqual(company.contact, contactOptions());
 });
 
 type LinkTarget = { href: string; type: string };
@@ -140,22 +140,21 @@ const resolvePointer = (document: unknown, pointer: string): unknown => {
   return pointer.slice(2).split("/").reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], document);
 };
 
-for (const authOn of [false, true]) {
-  test(`5. the OpenAPI document is consistent (authorization server ${authOn ? "on" : "off"})`, async () => {
-    const document = openapi(authOn) as OpenApi;
-    assert.ok(document.openapi.startsWith("3.1"));
-    for (const pointer of refsIn(document)) assert.ok(resolvePointer(document, pointer) !== undefined, `${pointer} does not resolve`);
-    for (const path of Object.keys(document.paths)) {
-      const url = new URL(`${document.servers[0].url}${path}`);
-      assert.ok(isOwned(url.pathname), `${url.pathname} is not owned by the router`);
-    }
-    assert.equal("/inquiries" in document.paths, authOn);
-    assert.equal(document.components.securitySchemes !== undefined, authOn);
-  });
-}
+test("5. the OpenAPI document is consistent and read-only", async () => {
+  const document = openapi() as OpenApi;
+  assert.ok(document.openapi.startsWith("3.1"));
+  for (const pointer of refsIn(document)) assert.ok(resolvePointer(document, pointer) !== undefined, `${pointer} does not resolve`);
+  for (const [path, operations] of Object.entries(document.paths)) {
+    const url = new URL(`${document.servers[0].url}${path}`);
+    assert.ok(isOwned(url.pathname), `${url.pathname} is not owned by the router`);
+    assert.deepEqual(Object.keys(operations), ["get"], `${path} has an operation other than GET`);
+  }
+  assert.equal(document.components.securitySchemes, undefined);
+  assert.equal("security" in document, false);
+});
 
 test("5. every GET path in the OpenAPI document answers 200 through route()", async () => {
-  const document = openapi(false) as OpenApi;
+  const document = openapi() as OpenApi;
   for (const [path, operations] of Object.entries(document.paths)) {
     if (!("get" in operations)) continue;
     const { response } = await call(new URL(`${document.servers[0].url}${path}`).pathname);
@@ -163,8 +162,8 @@ test("5. every GET path in the OpenAPI document answers 200 through route()", as
   }
 });
 
-test("5. the OpenAPI document is served with its media type and without the inquiry path while auth is off", async () => {
+test("5. the OpenAPI document is served with its media type", async () => {
   const { response } = await call("/api/v1/openapi.json");
   assert.equal(response.headers.get("Content-Type"), "application/vnd.oai.openapi+json");
-  assert.deepEqual(await response.json(), openapi(false));
+  assert.deepEqual(await response.json(), openapi());
 });

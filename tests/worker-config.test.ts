@@ -14,7 +14,7 @@ const ALLOWED_RELS = ["alternate", "api-catalog", "service-desc", "service-doc",
 type Config = {
   main: string;
   routes: { pattern: string }[];
-  send_email?: { name: string; allowed_destination_addresses: string[] }[];
+  send_email?: unknown;
   ratelimits?: { name: string; namespace_id: string; simple: { limit: number; period: number } }[];
 };
 
@@ -39,7 +39,7 @@ const envBindings = async (): Promise<string[]> => {
   const source = await readFile(HTTP_SOURCE, "utf8");
   const block = source.match(/export type Env = \{([^}]*)\}/);
   assert.ok(block, "Env type not found in http.ts");
-  return [...block[1].matchAll(/(\w+)\?:\s*(RateLimiter|EmailSender);/g)].map(([, name]) => name);
+  return [...block[1].matchAll(/(\w+)\?:\s*RateLimiter;/g)].map(([, name]) => name);
 };
 
 test("agent-readiness has exactly the wildcard route and the /api/v1 route", async () => {
@@ -94,16 +94,13 @@ test("only registered link relations are used", async () => {
 
 test("the config's bindings are exactly the binding names in Env", async () => {
   const config = await readConfig(AGENT_CONFIG);
-  const names = [...(config.ratelimits ?? []), ...(config.send_email ?? [])].map((binding) => binding.name).sort();
+  const names = (config.ratelimits ?? []).map((binding) => binding.name).sort();
   assert.deepEqual(names, (await envBindings()).sort());
-  assert.equal(names.length, 5);
+  assert.deepEqual(names, ["PUBLIC_LIMITER"]);
 });
 
-test("the email binding is locked to the contact Worker's destination", async () => {
-  const agent = (await readConfig(AGENT_CONFIG)).send_email ?? [];
-  const contact = (await readConfig(CONTACT_CONFIG)).send_email ?? [];
-  assert.equal(agent.length, 1);
-  assert.deepEqual(agent[0].allowed_destination_addresses, contact[0].allowed_destination_addresses);
+test("the Worker cannot send email", async () => {
+  assert.equal((await readConfig(AGENT_CONFIG)).send_email, undefined);
 });
 
 test("the rate limiter namespaces do not collide with the contact Worker's", async () => {
@@ -113,9 +110,9 @@ test("the rate limiter namespaces do not collide with the contact Worker's", asy
   for (const id of agent) assert.ok(!contact.includes(id), `namespace ${id} is also the contact Worker's`);
 });
 
-test("the config declares no storage and no secret", async () => {
+test("the config declares no storage and no variables", async () => {
   const config = await withoutComments(AGENT_CONFIG);
-  for (const key of ["kv_namespaces", "durable_objects", "d1_databases", "OAUTH_SIGNING_KEY", "TURNSTILE_SECRET"]) {
+  for (const key of ["kv_namespaces", "durable_objects", "d1_databases", "vars"]) {
     assert.ok(!new RegExp(`"${key}"\\s*:`).test(config), `config declares ${key}`);
   }
 });

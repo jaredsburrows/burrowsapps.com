@@ -23,26 +23,21 @@ const siteUrls = (text: string): string[] =>
 // Endpoint paths named inside code spans, such as `GET /api/v1/company`.
 const endpointPaths = (text: string): string[] => {
   const spans = [...text.matchAll(/`([^`]+)`/g)].map(([, span]) => span);
-  const paths = spans.flatMap((span) => span.match(/(?:^|\s)(\/(?:api\/v1|oauth|mcp)[^\s?]*)/g) ?? []).map((path) => path.trim());
+  const paths = spans.flatMap((span) => span.match(/(?:^|\s)(\/(?:api\/v1|mcp)[^\s?]*)/g) ?? []).map((path) => path.trim());
   return [...new Set(paths)];
-};
-
-// Items that a later task makes real.
-const PENDING: Record<string, string> = {
-  "https://burrowsapps.com/auth.md": "auth.md arrives in T33",
 };
 
 const developers = await read("developers.md");
 
 for (const url of siteUrls(developers)) {
-  test(`developers.md: ${url} resolves`, { todo: PENDING[url] ?? false }, async () => {
+  test(`developers.md: ${url} resolves`, async () => {
     assert.notEqual(resolveSiteUrl(url), null, `${url} does not resolve`);
   });
 }
 
 test("developers.md names only endpoint paths the Worker owns", async () => {
   const paths = endpointPaths(developers);
-  assert.ok(paths.includes("/api/v1/company") && paths.includes("/api/v1/inquiries"), paths.join(" "));
+  assert.ok(paths.includes("/api/v1/company"), paths.join(" "));
   for (const path of paths) assert.ok(isOwned(path), `${path} is not owned by the Worker`);
 });
 

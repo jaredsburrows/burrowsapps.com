@@ -4,22 +4,13 @@ import type { OriginFetch } from "./handler.ts";
 
 export type { OriginFetch };
 export type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
-export type EmailSender = { send(message: Record<string, unknown>): Promise<unknown> };
 
 export type Env = {
-  OAUTH_SIGNING_KEY?: string;
-  TURNSTILE_SECRET?: string;
-  TURNSTILE_SITE_KEY?: string;
-  INQUIRY_EMAIL?: EmailSender;
   PUBLIC_LIMITER?: RateLimiter;
-  AUTH_LIMITER?: RateLimiter;
-  APPROVE_LIMITER?: RateLimiter;
-  ONCE_LIMITER?: RateLimiter;
 };
 
 export type Deps = {
   originFetch: OriginFetch;
-  outboundFetch: typeof fetch;
   passThrough(): void;
   now(): number;
   log(line: string): void;

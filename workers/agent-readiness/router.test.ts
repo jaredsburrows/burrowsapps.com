@@ -34,7 +34,7 @@ test("2. an origin failure fails open with the same Request, undecorated", async
   assert.equal(response.headers.get("Link"), null);
 });
 
-for (const path of ["/api/v1/nope", "/mcp/nope", "/oauth/nope"]) {
+for (const path of ["/api/v1/nope", "/mcp/nope"]) {
   test(`5. ${path} is a JSON 404 from the Worker`, async () => {
     const deps = makeDeps();
     const response = await route(get(path), makeBaseEnv(), deps);

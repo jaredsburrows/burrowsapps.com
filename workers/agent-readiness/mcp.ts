@@ -5,7 +5,7 @@
 
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
 import { allow, clientIp, json, preflight, readBody, staticDoc } from "./http.ts";
-import type { Deps, Env } from "./http.ts";
+import type { Env } from "./http.ts";
 
 export const SERVER = { name: "com.burrowsapps/site", title: "Burrows Applications", version: "1.0.0" } as const;
 export const MODERN_VERSION = "2026-07-28";
@@ -55,14 +55,14 @@ export const TOOLS: readonly Tool[] = [
   },
 ];
 
-function toolData(name: unknown, authOn: boolean): Record<string, unknown> | null {
+function toolData(name: unknown): Record<string, unknown> | null {
   switch (name) {
     case "get_company_profile":
       return { ...COMPANY };
     case "list_services":
       return { services: SERVICES };
     case "get_contact_options":
-      return contactOptions(authOn);
+      return contactOptions();
     default:
       return null;
   }
@@ -162,8 +162,8 @@ function hasNoArguments(params: Record<string, unknown>): boolean {
 }
 
 // The tools/call result for a known tool, or null for an unknown one.
-function callTool(params: Record<string, unknown>, authOn: boolean): Record<string, unknown> | null {
-  const data = toolData(params.name, authOn);
+function callTool(params: Record<string, unknown>): Record<string, unknown> | null {
+  const data = toolData(params.name);
   if (data === null) return null;
   if (!hasNoArguments(params)) {
     return { content: [{ type: "text", text: "This tool takes no arguments." }], isError: true };
@@ -171,7 +171,7 @@ function callTool(params: Record<string, unknown>, authOn: boolean): Record<stri
   return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data, isError: false };
 }
 
-function modern(request: Request, message: Message, params: Record<string, unknown>, authOn: boolean): Response {
+function modern(request: Request, message: Message, params: Record<string, unknown>): Response {
   if (message.id === undefined) return accepted();
   const id = message.id;
   const meta = isObject(params._meta) ? params._meta : {};
@@ -211,7 +211,7 @@ function modern(request: Request, message: Message, params: Record<string, unkno
     case "tools/list":
       return complete({ tools: TOOLS, ttlMs: TTL_MS, cacheScope: "public" });
     case "tools/call": {
-      const result = callTool(params, authOn);
+      const result = callTool(params);
       if (result === null) return rpcError(id, -32602, "Unknown tool", 400);
       return complete(result);
     }
@@ -222,7 +222,7 @@ function modern(request: Request, message: Message, params: Record<string, unkno
 
 // 2025-03-26 to 2025-11-25: JSON-RPC errors travel with HTTP 200. No state is
 // kept, so a client that skips initialize is still served.
-function legacy(message: Message, params: Record<string, unknown>, authOn: boolean): Response {
+function legacy(message: Message, params: Record<string, unknown>): Response {
   if (message.id === undefined) return accepted();
   const id = message.id;
   switch (message.method) {
@@ -238,7 +238,7 @@ function legacy(message: Message, params: Record<string, unknown>, authOn: boole
     case "tools/list":
       return rpcResult(id, { tools: TOOLS });
     case "tools/call": {
-      const result = callTool(params, authOn);
+      const result = callTool(params);
       if (result === null) return rpcError(id, -32602, "Unknown tool", 200);
       return rpcResult(id, result);
     }
@@ -247,7 +247,7 @@ function legacy(message: Message, params: Record<string, unknown>, authOn: boole
   }
 }
 
-export async function endpoint(request: Request, env: Env, _deps: Deps, authOn: boolean): Promise<Response> {
+export async function endpoint(request: Request, env: Env): Promise<Response> {
   if (request.method === "OPTIONS") {
     return preflight("POST, OPTIONS", "Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name, Mcp-Session-Id");
   }
@@ -284,6 +284,6 @@ export async function endpoint(request: Request, env: Env, _deps: Deps, authOn: 
   const metaVersion = isObject(params._meta) ? params._meta[META_VERSION] : undefined;
   const header = request.headers.get("MCP-Protocol-Version");
   const isModern = typeof metaVersion === "string" || (header !== null && !(LEGACY_VERSIONS as readonly string[]).includes(header));
-  if (isModern) return modern(request, message, params, authOn);
-  return legacy(message, params, authOn);
+  if (isModern) return modern(request, message, params);
+  return legacy(message, params);
 }

@@ -7,7 +7,6 @@ export default {
   async fetch(request: Request, env: Env, ctx: Context): Promise<Response> {
     return route(request, env ?? {}, {
       originFetch: (originRequest) => fetch(originRequest),
-      outboundFetch: (input, init) => fetch(input, init),
       passThrough: () => ctx.passThroughOnException(),
       now: () => Date.now(),
       log: (line) => console.log(line),
