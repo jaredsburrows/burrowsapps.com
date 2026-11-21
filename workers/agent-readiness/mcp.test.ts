@@ -126,7 +126,7 @@ test("modern: missing MCP-Protocol-Version header is 400 with -32020", async () 
 });
 
 test("modern: header and body versions that differ are 400 with -32020", async () => {
-  await expectError(await send(modern("tools/list", { headers: { "MCP-Protocol-Version": "2026-08-01" } })), 400, -32020);
+  await expectError(await send(modern("tools/list", { headers: { "MCP-Protocol-Version": "2025-06-18" } })), 400, -32020);
 });
 
 test("modern: an unsupported version is 400 with -32022 and the supported list", async () => {
@@ -280,7 +280,7 @@ const legacyResult = async (response: Response): Promise<Record<string, any>> =>
 const initialize = (protocolVersion: string): RequestInit =>
   legacy("initialize", { protocolVersion, capabilities: {}, clientInfo: { name: "test", version: "1" } });
 
-for (const version of ["2025-11-25", "2025-06-18", "2025-03-26"]) {
+for (const version of ["2025-11-25", "2025-06-18"]) {
   test(`legacy: initialize with ${version} echoes the version`, async () => {
     const response = await send(initialize(version));
     assert.equal(response.headers.get("Mcp-Session-Id"), null);
@@ -292,7 +292,7 @@ for (const version of ["2025-11-25", "2025-06-18", "2025-03-26"]) {
   });
 }
 
-for (const version of ["2024-11-05", "2026-07-28"]) {
+for (const version of ["2024-11-05", "2025-03-26", "2026-07-28"]) {
   test(`legacy: initialize with ${version} and no _meta answers 2025-11-25`, async () => {
     assert.equal((await legacyResult(await send(initialize(version)))).protocolVersion, "2025-11-25");
   });
@@ -408,4 +408,25 @@ test("card: the tools listed are exactly the tools tools/list returns", async ()
   assert.deepEqual(CARD.tools, listed.map(({ name, description }) => ({ name, description })));
   const legacyListed = (await legacyResult(await send(legacy("tools/list")))).tools as { name: string; description: string }[];
   assert.deepEqual(CARD.tools, legacyListed.map(({ name, description }) => ({ name, description })));
+});
+
+// Version headers the server does not speak
+
+for (const version of ["2024-11-05", "2025-03-26", "2026-08-01", "bogus"]) {
+  test(`version: MCP-Protocol-Version ${version} with no _meta is 400 with -32022 and the supported list`, async () => {
+    const body = await expectError(await send(legacy("tools/list", {}, 1, { "MCP-Protocol-Version": version })), 400, -32022);
+    assert.deepEqual(body.error?.data, { supported: SUPPORTED_VERSIONS, requested: version });
+    assert.equal(body.id, 1);
+  });
+}
+
+test("version: 2025-03-26 is not claimed anywhere the server lists its versions", async () => {
+  assert.ok(!SUPPORTED_VERSIONS.includes("2025-03-26"));
+  assert.ok(!JSON.stringify(CARD).includes("2025-03-26"));
+  const discover = await expectComplete(await send(modern("server/discover")));
+  assert.ok(!discover.supportedVersions.includes("2025-03-26"));
+});
+
+test("version: a batch is refused, which is why no batch-allowing version is claimed", async () => {
+  await expectError(await send(post([{ jsonrpc: "2.0", id: 1, method: "ping" }], { "MCP-Protocol-Version": "2025-06-18" })), 400, -32600);
 });

@@ -20,7 +20,7 @@ API catalog (RFC 9727): https://burrowsapps.com/.well-known/api-catalog
 
 Endpoint: `https://burrowsapps.com/mcp`. Streamable HTTP, `POST` only, JSON responses, stateless.
 
-Protocol versions: `2026-07-28`, and `2025-11-25`, `2025-06-18`, and `2025-03-26` through the `initialize` handshake.
+Protocol versions: `2026-07-28`, and `2025-11-25` and `2025-06-18` through the `initialize` handshake.
 
 Server card: https://burrowsapps.com/mcp/server-card
 

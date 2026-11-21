@@ -32,7 +32,7 @@ Files and endpoints that tell AI agents and crawlers what this site is and how t
 | `/api/v1`, `/api/v1/company`, `/api/v1/services`, `/api/v1/status` | Read-only JSON API with the company facts from `workers/agent-readiness/facts.ts` | Worker | |
 | `/api/v1/openapi.json` | OpenAPI 3.1 description of that API | Worker | [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) |
 | `/.well-known/api-catalog` | API catalog listing the API and the MCP server | Worker | [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) |
-| `/mcp` | Stateless, read-only MCP server with three tools (2026-07-28, plus the `initialize` handshake for 2025 clients) | Worker | [MCP](https://modelcontextprotocol.io/) |
+| `/mcp` | Stateless, read-only MCP server with three tools (2026-07-28, plus the `initialize` handshake for 2025-06-18 and 2025-11-25 clients) | Worker | [MCP](https://modelcontextprotocol.io/) |
 | `/mcp/server-card`, `/.well-known/mcp/server-card.json` | MCP server card, one document at both paths | Worker | SEP-2127 |
 | `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` | OAuth metadata that says `"status": "not_offered"`: no authorization server runs here | Worker | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) |
 | `/auth.md` | Says that no authentication is required, offered, or possible, and that `/api/contact` is meant only for the contact form | Pages | [auth.md](https://workos.com/auth-md/docs/auth-md) |

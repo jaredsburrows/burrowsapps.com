@@ -1,6 +1,6 @@
 // A stateless, read-only MCP server at /mcp. It speaks the 2026-07-28
 // revision, where every request carries its protocol version, and answers the
-// initialize handshake of 2025-03-26 to 2025-11-25 for older clients. JSON
+// initialize handshake of 2025-06-18 and 2025-11-25 for older clients. JSON
 // responses only: no sessions, no SSE stream, nothing kept between requests.
 
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
@@ -9,7 +9,8 @@ import type { Env } from "./http.ts";
 
 export const SERVER = { name: "com.burrowsapps/site", title: "Burrows Applications", version: "1.0.0" } as const;
 export const MODERN_VERSION = "2026-07-28";
-export const LEGACY_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26"] as const;
+// 2025-03-26 is not claimed: it allows JSON-RPC batches, which this server rejects.
+export const LEGACY_VERSIONS = ["2025-11-25", "2025-06-18"] as const;
 export const SUPPORTED_VERSIONS: readonly string[] = [MODERN_VERSION, ...LEGACY_VERSIONS];
 export const INSTRUCTIONS = "Read-only facts about Burrows Applications, a software company that builds native Android and iOS apps, Kotlin Multiplatform apps, and websites. Call get_contact_options to learn how to send an inquiry; this server cannot send one.";
 
@@ -222,7 +223,7 @@ function modern(request: Request, message: Message, params: Record<string, unkno
   }
 }
 
-// 2025-03-26 to 2025-11-25: JSON-RPC errors travel with HTTP 200. No state is
+// 2025-06-18 and 2025-11-25: JSON-RPC errors travel with HTTP 200. No state is
 // kept, so a client that skips initialize is still served.
 function legacy(message: Message, params: Record<string, unknown>): Response {
   if (message.id === undefined) return accepted();
@@ -285,6 +286,11 @@ export async function endpoint(request: Request, env: Env): Promise<Response> {
   const params = isObject(message.params) ? message.params : {};
   const metaVersion = isObject(params._meta) ? params._meta[META_VERSION] : undefined;
   const header = request.headers.get("MCP-Protocol-Version");
+  // A version header this server does not speak, or one that is not a version
+  // at all, gets the unsupported-version error whatever else the body says.
+  if (header !== null && !SUPPORTED_VERSIONS.includes(header)) {
+    return rpcError(message.id, -32022, "Unsupported protocol version", 400, { supported: SUPPORTED_VERSIONS, requested: header.slice(0, 64) });
+  }
   const isModern = typeof metaVersion === "string" || (header !== null && !(LEGACY_VERSIONS as readonly string[]).includes(header));
   if (isModern) return modern(request, message, params);
   return legacy(message, params);
