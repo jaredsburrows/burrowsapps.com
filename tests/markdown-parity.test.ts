@@ -13,6 +13,7 @@ const PAIRS: readonly Pair[] = [
     markdown: "index.md",
     mustContain: ["contact@burrowsapps.com", "https://burrowsapps.com/privacy.html"],
   },
+  { html: "privacy.html", markdown: "privacy.md", mustContain: [] },
 ];
 
 const ENTITIES: Readonly<Record<string, string>> = {
