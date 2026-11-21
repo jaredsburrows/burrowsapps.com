@@ -129,3 +129,53 @@ test("a registerTool that returns undefined is fine", async () => {
   assert.doesNotThrow(() => dom.run());
   assert.equal(modelContext.tools.length, 1);
 });
+
+const registeredTool = (): { dom: FakeDom; tool: Tool } => {
+  const modelContext = fakeModelContext();
+  const dom = createFakeDom({ documentModelContext: modelContext });
+  dom.run();
+  assert.equal(modelContext.tools.length, 1);
+  return { dom, tool: modelContext.tools[0] };
+};
+
+test("execute with valid input fills the form and sends what the human path sends", async () => {
+  const { dom, tool } = registeredTool();
+  const result = plain(await tool.execute({ ...VALID }));
+  assert.equal(result.status, "sent");
+  assertContactPost(dom);
+  assert.deepEqual(dom.fetchCalls[0].fields, VALID);
+  assert.equal(dom.status.innerHTML, SENT_STATUS);
+});
+
+for (const behavior of ["not-ok", "reject"] as const) {
+  test(`execute reports failed when fetch is ${behavior}`, async () => {
+    const { dom, tool } = registeredTool();
+    dom.fetchBehavior = behavior;
+    const result = plain(await tool.execute({ ...VALID }));
+    assert.equal(result.status, "failed");
+    assert.equal(dom.fetchCalls.length, 1);
+    assert.equal(dom.status.className, "form-status error");
+  });
+}
+
+const INVALID_INPUTS: ReadonlyArray<[string, unknown, string[]]> = [
+  ["an invalid email", { ...VALID, email: "not-an-email" }, ["email"]],
+  ["a missing field", { name: VALID.name, email: VALID.email }, ["message"]],
+  ["a non-object input", "send it", ["name", "email", "message"]],
+  ["a 5,001-character message", { ...VALID, message: "x".repeat(5001) }, ["message"]],
+];
+
+for (const [label, input, badFields] of INVALID_INPUTS) {
+  test(`execute with ${label} sends nothing and names the bad fields`, async () => {
+    const { dom, tool } = registeredTool();
+    const result = plain(await tool.execute(input));
+    assert.equal(result.status, "invalid");
+    assert.equal(dom.fetchCalls.length, 0);
+    const errors = result.errors as Record<string, string>;
+    assert.deepEqual(Object.keys(errors).sort(), [...badFields].sort());
+    for (const field of badFields) {
+      assert.ok(errors[field].length > 0);
+      assert.equal(dom.fields[field as "name" | "email" | "message"].invalid, true);
+    }
+  });
+}

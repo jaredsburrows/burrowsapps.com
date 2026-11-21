@@ -90,3 +90,11 @@ test("every burrowsapps.com URL in SKILL.md maps to a file in the repo", async (
     }
   }
 });
+
+test("the WebMCP tool named in SKILL.md is the one home.js registers", async () => {
+  const tool = "send_contact_message";
+  const skill = await readFile(new URL(".well-known/agent-skills/contact-burrows-applications/SKILL.md", REPO), "utf8");
+  const script = await readFile(new URL("static/js/home.js", REPO), "utf8");
+  assert.ok(skill.includes(`\`${tool}\``), `SKILL.md does not name ${tool}`);
+  assert.ok(script.includes(`'${tool}'`), `home.js does not register ${tool}`);
+});
