@@ -116,7 +116,7 @@ test("4. every link in the API entry of the catalog resolves on the site", async
   for (const href of targets(entries[0])) assert.notEqual(resolveSiteUrl(href), null, `${href} does not resolve`);
 });
 
-test("4. every link in the MCP entry of the catalog resolves on the site", { todo: "/mcp arrives in T22 and T24" }, async () => {
+test("4. every link in the MCP entry of the catalog resolves on the site", async () => {
   for (const href of targets(entries[1])) assert.notEqual(resolveSiteUrl(href), null, `${href} does not resolve`);
 });
 

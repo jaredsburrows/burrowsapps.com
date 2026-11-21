@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
-import { MODERN_VERSION, SERVER, SUPPORTED_VERSIONS, TOOLS } from "./mcp.ts";
+import { CARD, MODERN_VERSION, SERVER, SUPPORTED_VERSIONS, TOOLS } from "./mcp.ts";
 import { route } from "./router.ts";
 import { makeBaseEnv, makeDeps } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
@@ -339,4 +339,66 @@ test("legacy: a whole session in order", async () => {
 test("legacy: tools/call with no prior initialize is served", async () => {
   const call = await legacyResult(await send(legacy("tools/call", { name: "get_contact_options" })));
   assert.deepEqual(call.structuredContent, contactOptions(false));
+});
+
+// Card
+
+const CARD_PATHS: Record<string, string> = {
+  "/mcp/server-card": "application/mcp-server-card+json",
+  "/.well-known/mcp/server-card.json": "application/json",
+};
+
+const fetchCard = (path: string, init: RequestInit = {}): Promise<Response> =>
+  route(new Request(`https://burrowsapps.com${path}`, init), makeBaseEnv(), makeDeps());
+
+test("card: both paths return the same bytes", async () => {
+  const [a, b] = await Promise.all(Object.keys(CARD_PATHS).map(async (path) => (await fetchCard(path)).text()));
+  assert.equal(a, b);
+  assert.deepEqual(JSON.parse(a), CARD);
+});
+
+for (const [path, type] of Object.entries(CARD_PATHS)) {
+  test(`card: ${path} has its content type and the CORS headers`, async () => {
+    const response = await fetchCard(path);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Content-Type"), type);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET");
+    assert.equal(response.headers.get("Access-Control-Allow-Headers"), "Content-Type, If-None-Match");
+    assert.equal(response.headers.get("Access-Control-Expose-Headers"), "ETag");
+    assert.equal(response.headers.get("Cache-Control"), "public, max-age=3600");
+    assert.equal((await fetchCard(path, { method: "POST" })).status, 405);
+  });
+}
+
+test("card: $schema, name, version, and description meet the schema", async () => {
+  assert.match(String(CARD.$schema), /^https:\/\/static\.modelcontextprotocol\.io\/schemas\/v1\/server-card\.schema\.json$/);
+  const name = String(CARD.name);
+  assert.match(name, /^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/);
+  assert.ok(name.length >= 3 && name.length <= 200);
+  const description = String(CARD.description);
+  assert.ok(description.length >= 1 && description.length <= 100, `${description.length} characters`);
+  assert.ok(String(CARD.version).length <= 255);
+  const remotes = CARD.remotes as { type: string; url: string }[];
+  assert.equal(remotes.length, 1);
+  assert.ok(["streamable-http", "sse"].includes(remotes[0].type));
+});
+
+test("card: the remote url and the transport endpoint are the path that serves MCP", async () => {
+  const remote = (CARD.remotes as { url: string }[])[0].url;
+  const transport = (CARD.transport as { endpoint: string }).endpoint;
+  assert.equal(new URL(transport, "https://burrowsapps.com/").href, remote);
+  const response = await route(new Request(remote, modern("server/discover")), makeBaseEnv(), makeDeps());
+  await expectComplete(response);
+});
+
+test("card: serverInfo, versions, and capabilities match what the server answers", async () => {
+  const init = await legacyResult(await send(initialize("2025-11-25")));
+  const discover = await expectComplete(await send(modern("server/discover")));
+  assert.deepEqual(CARD.serverInfo, init.serverInfo);
+  assert.deepEqual((CARD.remotes as { supportedProtocolVersions: string[] }[])[0].supportedProtocolVersions, discover.supportedVersions);
+  assert.deepEqual(CARD.capabilities, init.capabilities);
+  assert.deepEqual(CARD.capabilities, discover.capabilities);
+  assert.equal(CARD.version, discover._meta[META_SERVER_INFO].version);
+  assert.equal(CARD.protocolVersion, MODERN_VERSION);
 });

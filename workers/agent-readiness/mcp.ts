@@ -4,7 +4,7 @@
 // responses only: no sessions, no SSE stream, nothing kept between requests.
 
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
-import { allow, clientIp, json, preflight, readBody } from "./http.ts";
+import { allow, clientIp, json, preflight, readBody, staticDoc } from "./http.ts";
 import type { Deps, Env } from "./http.ts";
 
 export const SERVER = { name: "com.burrowsapps/site", title: "Burrows Applications", version: "1.0.0" } as const;
@@ -66,6 +66,44 @@ function toolData(name: unknown, authOn: boolean): Record<string, unknown> | nul
     default:
       return null;
   }
+}
+
+const ENDPOINT_PATH = "/mcp";
+
+// One document for both locations: the current server card format ($schema,
+// name, version, description, remotes) plus the SEP-1649 fields that older
+// readers look for (serverInfo, protocolVersion, transport, capabilities).
+export const CARD: Record<string, unknown> = {
+  $schema: "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+  name: SERVER.name,
+  version: SERVER.version,
+  title: SERVER.title,
+  description: "Read-only facts about Burrows Applications: what it builds and how to get in touch.",
+  websiteUrl: "https://burrowsapps.com/",
+  remotes: [
+    {
+      type: "streamable-http",
+      url: `https://burrowsapps.com${ENDPOINT_PATH}`,
+      supportedProtocolVersions: SUPPORTED_VERSIONS,
+    },
+  ],
+  serverInfo: { name: SERVER.name, title: SERVER.title, version: SERVER.version },
+  protocolVersion: MODERN_VERSION,
+  transport: { type: "streamable-http", endpoint: ENDPOINT_PATH },
+  capabilities: CAPABILITIES,
+};
+
+const CARD_BODY = JSON.stringify(CARD);
+const CARD_HEADERS = {
+  "Cache-Control": "public, max-age=3600",
+  "Access-Control-Allow-Methods": "GET",
+  "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
+  "Access-Control-Expose-Headers": "ETag",
+};
+
+export function card(request: Request, url: URL): Response {
+  const contentType = url.pathname === "/mcp/server-card" ? "application/mcp-server-card+json" : "application/json";
+  return staticDoc(request, CARD_BODY, contentType, CARD_HEADERS);
 }
 
 type Message = { jsonrpc: "2.0"; method: string; id?: string | number; params?: unknown };
