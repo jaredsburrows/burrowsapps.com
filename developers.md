@@ -28,7 +28,7 @@ Tools, all read-only and without arguments: `get_company_profile`, `list_service
 
 ## No login
 
-Nothing here needs a credential, and none is offered. There is no programmatic way to send a message: the contact form's endpoint, `/api/contact`, accepts submissions only from the form on burrowsapps.com.
+Nothing here needs a credential, and none is offered. The contact form's endpoint, `/api/contact`, is meant only for the form on burrowsapps.com and is protected by bot checks and rate limits. To send a message, use the form or email.
 
 ## Limits
 

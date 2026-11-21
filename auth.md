@@ -6,7 +6,7 @@ Agent authentication and registration discovery for `burrowsapps.com`.
 
 **No authentication is required, offered, or possible.** Burrows Applications has no login. Every URL this site publishes can be fetched anonymously, and nothing here issues a credential.
 
-The site does run endpoints, and none of them takes a credential. Two are built for agents and serve read-only facts about the company anonymously: the JSON API under `/api/v1` and an MCP server at `/mcp`. The third, `/api/contact`, is the backend of the site's contact form. Each is described below so that an agent learns this here rather than discovering it as a `404`.
+The site does run endpoints, and none of them takes a credential. Two are built for agents and serve read-only facts about the company anonymously: the JSON API under `/api/v1` and an MCP server at `/mcp`. The third, `/api/contact`, is the backend of the site's contact form and is meant only for that form. Each is described below so that an agent learns this here rather than discovering it as a `404`.
 
 ## Sent here to sign in?
 
@@ -22,17 +22,11 @@ There is no sign-in on this site and nothing to authorize. If an app opened this
 
 No path named anywhere in this document is a registration endpoint. If a discovery scanner has handed you one for this origin, it misread this file: none of the endpoints described below creates an account or issues a credential, and there is nothing here to sign up for.
 
-## The contact form endpoint, and why a credential would not help
+## The contact form endpoint
 
-`POST /api/contact` sends a message to Burrows Applications. It does not read anything back, store anything, or take a credential.
+`POST /api/contact` is the backend of the contact form at [`/#contact`](/#contact). It is meant only for that form, and it is protected by bot checks and rate limits, not by any identity system: there is no credential, token, or API key for it, and none would be accepted. Its refusals are a `404`, not a `401`.
 
-It is still not callable by an agent, and the reasons are browser checks, not authentication:
-
-- **An `Origin` header naming this site is required.** The endpoint exists for the form at [`/#contact`](/#contact); a request carrying no `Origin`, or one naming anywhere else, is refused.
-- **A Cloudflare Turnstile token may be required.** Whether the check is armed is an operational setting rather than something readable from outside. The token can only be minted by a browser that loaded the widget on the form's own page, so no program can produce one.
-- **Without that `Origin` it refuses with `404`, never `401`.** A missing `Origin`, an unsupported method, and an unsupported content type all produce a bare `404` with no body. That `404` does not mean the endpoint has been removed. Past those checks, a missing or rejected Turnstile token is a `403`: a failed bot check, not a request for credentials.
-
-So do not attempt `POST /api/contact`, and do not go looking for the token or the API key that would make it work: neither exists. If a person is present, send them to [the contact form](/#contact) or to contact@burrowsapps.com. In the person's browser, the homepage also registers a WebMCP tool named `send_contact_message` that fills in and submits that same form.
+Agents should not call it. If a person is present, send them to [the contact form](/#contact) or to contact@burrowsapps.com. In the person's browser, the homepage also registers a WebMCP tool named `send_contact_message` that fills in and submits that same form.
 
 ## The endpoints built for agents
 

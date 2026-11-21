@@ -35,7 +35,7 @@ Files and endpoints that tell AI agents and crawlers what this site is and how t
 | `/mcp` | Stateless, read-only MCP server with three tools (2026-07-28, plus the `initialize` handshake for 2025 clients) | Worker | [MCP](https://modelcontextprotocol.io/) |
 | `/mcp/server-card`, `/.well-known/mcp/server-card.json` | MCP server card, one document at both paths | Worker | SEP-2127 |
 | `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` | OAuth metadata that says `"status": "not_offered"`: no authorization server runs here | Worker | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) |
-| `/auth.md` | Says that no authentication is required, offered, or possible, and why `/api/contact` is closed to programs | Pages | [auth.md](https://workos.com/auth-md/docs/auth-md) |
+| `/auth.md` | Says that no authentication is required, offered, or possible, and that `/api/contact` is meant only for the contact form | Pages | [auth.md](https://workos.com/auth-md/docs/auth-md) |
 | `static/js/home.js` | Registers the contact form as the WebMCP tool `send_contact_message` in browsers that support it | Pages | [WebMCP](https://webmachinelearning.github.io/webmcp/) |
 | `_index._agents.burrowsapps.com` | DNS-AID record (see below) | DNS | DNS-AID draft |
 

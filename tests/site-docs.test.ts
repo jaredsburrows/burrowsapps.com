@@ -92,13 +92,27 @@ test("auth.md names only endpoint paths the Worker owns, plus the contact form's
   for (const path of ["/api/v1", "/mcp", "/api/contact"]) assert.ok(authMd.includes(`\`${path}\``), `auth.md does not name ${path}`);
 });
 
-test("auth.md's reasons the contact endpoint is closed are in the contact Worker", async () => {
+test("auth.md's statements about the contact endpoint are in the contact Worker", async () => {
+  // Meant only for the form: the Worker keeps an allow-list of the site's origins.
   assert.match(contactWorker, /const ALLOWED_ORIGINS = \[\s*"https:\/\/burrowsapps\.com"/, "the Origin allow-list is gone");
-  assert.match(contactWorker, /if \(!originAllowed\) return status\(404\);/, "a foreign Origin is no longer a 404");
-  assert.match(contactWorker, /if \(request\.method !== "POST"\) return status\(404\);/, "an unsupported method is no longer a 404");
-  assert.match(contactWorker, /if \(!isJson && !isForm\) return status\(404\);/, "an unsupported content type is no longer a 404");
-  assert.match(contactWorker, /return fail\(403\)/, "a failed Turnstile check is no longer a 403");
+  // Bot checks and rate limits.
+  assert.match(contactWorker, /data\.company\?\.trim\(\)/, "the honeypot is gone");
+  assert.match(contactWorker, /env\.TURNSTILE_SECRET/, "the Turnstile check is gone");
+  assert.match(contactWorker, /env\.RATE_LIMITER/, "the per-IP rate limit is gone");
+  assert.match(contactWorker, /env\.GLOBAL_LIMITER/, "the global rate limit is gone");
+  // Refusals are a 404, not a 401, and no credential is read.
+  assert.match(contactWorker, /return status\(404\);/, "refusals are no longer a 404");
   assert.ok(!/status\(401\)/.test(contactWorker), "the contact Worker now sends 401");
+  assert.ok(!/headers\.get\(\s*["'`]authorization["'`]/i.test(contactWorker), "the contact Worker now reads a credential");
+});
+
+test("the docs do not describe how the contact endpoint's checks respond", async () => {
+  const skill = await read(".well-known/agent-skills/contact-burrows-applications/SKILL.md");
+  for (const [name, text] of [["auth.md", authMd], ["developers.md", developers], ["SKILL.md", skill]] as const) {
+    for (const phrase of [/\b403\b/, /not callable/i, /no program/i, /only from the form/i, /rejects every other/i, /Origin` header/]) {
+      assert.ok(!phrase.test(text), `${name} matches ${phrase}`);
+    }
+  }
 });
 
 test("no Worker reads a credential or challenges for one, which is what auth.md says", async () => {

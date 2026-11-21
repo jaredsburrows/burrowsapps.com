@@ -6,7 +6,7 @@
       "type": "skill-md",
       "description": "Explains what Burrows Applications builds (native Android and iOS apps, Kotlin Multiplatform, and websites) and how to send the company a project inquiry. Use when someone wants to hire, contact, or learn about Burrows Applications.",
       "url": "/.well-known/agent-skills/contact-burrows-applications/SKILL.md",
-      "digest": "sha256:f019a1226c0507b8666b4c4d6bd94097f6aecf327a1e55ffa29f4898f8b275ca"
+      "digest": "sha256:59b11cea50cf7823c5b35d8b0dca60434361a06e16a638813744f591009bc836"
     }
   ]
 }
