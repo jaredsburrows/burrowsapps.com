@@ -96,7 +96,7 @@ function varyCoversAccept(vary: string | null): boolean {
 
 export async function handle(request: Request, originFetch: OriginFetch): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return originFetch(request);
-  // The query string is ignored here; the exact routes keep query-string URLs away.
+  // The query string is ignored, so "/?sent=1" and "/?utm_source=x" are decorated as "/".
   const page = PAGES[new URL(request.url).pathname];
   if (!page) return originFetch(request);
 
