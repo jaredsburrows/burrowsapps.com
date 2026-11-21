@@ -370,7 +370,7 @@ test("handle: an upper-case text/html markdown content type falls back", async (
 });
 
 // B1: Vary "*" must stay alone; "*, Accept" is not a valid Vary field value.
-test("handle: an origin Vary of * is left as *", { todo: "B1" }, async () => {
+test("handle: an origin Vary of * is left as *", async () => {
   const origin = stubOrigin({ "https://burrowsapps.com/": htmlPage(200, { Vary: "*" }) });
   const response = await handle(get("https://burrowsapps.com/"), origin.fetch);
   assert.equal(response.headers.get("Vary"), "*");

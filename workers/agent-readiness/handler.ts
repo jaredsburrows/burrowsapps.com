@@ -88,8 +88,10 @@ async function markdownResponse(request: Request, page: Page, originFetch: Origi
   return new Response(request.method === "HEAD" ? null : markdown, { status: 200, headers });
 }
 
-function varyHasAccept(vary: string | null): boolean {
-  return (vary ?? "").split(",").some((token) => token.trim().toLowerCase() === "accept");
+// True when the origin's Vary already covers Accept, either by naming it or
+// with "*", which must stand alone and already means "varies on everything".
+function varyCoversAccept(vary: string | null): boolean {
+  return (vary ?? "").split(",").some((token) => ["accept", "*"].includes(token.trim().toLowerCase()));
 }
 
 export async function handle(request: Request, originFetch: OriginFetch): Promise<Response> {
@@ -113,7 +115,7 @@ export async function handle(request: Request, originFetch: OriginFetch): Promis
     if (response.status !== 200 && response.status !== 304) return response;
     const out = new Response(response.body, response);
     out.headers.append("Link", formatLinks(page.links));
-    if (!varyHasAccept(out.headers.get("Vary"))) out.headers.append("Vary", "Accept");
+    if (!varyCoversAccept(out.headers.get("Vary"))) out.headers.append("Vary", "Accept");
     return out;
   } catch {
     return response;
