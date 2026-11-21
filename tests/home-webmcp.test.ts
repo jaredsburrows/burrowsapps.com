@@ -79,6 +79,19 @@ test("document.modelContext gets exactly one well-formed tool", async () => {
   assert.equal(typeof tool.execute, "function");
 });
 
+// S1: the confirmation instruction must live in the tool itself, since an in-page
+// agent may never load SKILL.md. Checked by meaning (a confirmation verb and every
+// required field), not by exact wording.
+test("the tool description tells the agent to confirm every required field with the user first", async () => {
+  const modelContext = fakeModelContext();
+  createFakeDom({ documentModelContext: modelContext }).run();
+  const [tool] = modelContext.tools;
+  const sentence = tool.description.split(/(?<=\.)\s+/).find((part) => /\bconfirm/i.test(part));
+  assert.ok(sentence, "no sentence asks for confirmation");
+  assert.match(sentence, /\buser\b/i);
+  for (const field of tool.inputSchema.required) assert.match(sentence, new RegExp(`\\b${field}\\b`, "i"));
+});
+
 test("navigator.modelContext is used when document has none", async () => {
   const modelContext = fakeModelContext();
   createFakeDom({ navigatorModelContext: modelContext }).run();

@@ -153,7 +153,8 @@
         title: 'Send a message to Burrows Applications',
         description: 'Send a message to Burrows Applications, a mobile and web app development company, '
           + 'through the contact form on this page. Use it for project inquiries. The message is emailed '
-          + 'to the owner, who replies to the email address provided.',
+          + 'to the owner, who replies to the email address provided. Before calling, show the user the exact '
+          + 'name, email, and message and get their confirmation.',
         inputSchema: {
           type: 'object',
           properties: {
