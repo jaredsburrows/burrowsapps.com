@@ -16,6 +16,29 @@
         "who can build a Kotlin Multiplatform app for Android and iOS",
         "send a project inquiry to Burrows Applications"
       ]
+    },
+    {
+      "identifier": "urn:air:burrowsapps.com:mcp:site",
+      "displayName": "Burrows Applications MCP server",
+      "description": "Read-only MCP server with facts about Burrows Applications: company profile, services, and how to get in touch.",
+      "type": "application/mcp-server-card+json",
+      "url": "https://burrowsapps.com/mcp/server-card",
+      "representativeQueries": [
+        "what does Burrows Applications build",
+        "list the services Burrows Applications offers",
+        "how can I get in touch with Burrows Applications"
+      ]
+    },
+    {
+      "identifier": "urn:air:burrowsapps.com:api:public-v1",
+      "displayName": "Burrows Applications public API",
+      "description": "Read-only JSON API with the company profile, services, and a status endpoint, described with OpenAPI 3.1.",
+      "type": "application/vnd.oai.openapi+json",
+      "url": "https://burrowsapps.com/api/v1/openapi.json",
+      "representativeQueries": [
+        "get the Burrows Applications company profile as JSON",
+        "which platforms does Burrows Applications develop for"
+      ]
     }
   ]
 }

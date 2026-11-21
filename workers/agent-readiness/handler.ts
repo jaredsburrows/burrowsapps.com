@@ -7,13 +7,16 @@ export type OriginFetch = (request: Request) => Promise<Response>;
 export type PageLink = { href: string; rel: string; type?: string };
 export type Page = { markdown: string; links: readonly PageLink[] };
 
-// Only IANA-registered relations, each pointing at a file in this repo.
-// Targets are path-absolute so the same value is right on apex and www.
+// Only IANA-registered relations, each pointing at a file in this repo or a
+// path this Worker serves. Targets are path-absolute.
 export const PAGES: Readonly<Record<string, Page>> = {
   "/": {
     markdown: "/index.md",
     links: [
       { href: "/index.md", rel: "alternate", type: "text/markdown" },
+      { href: "/.well-known/api-catalog", rel: "api-catalog", type: "application/linkset+json" },
+      { href: "/api/v1/openapi.json", rel: "service-desc", type: "application/vnd.oai.openapi+json" },
+      { href: "/developers.md", rel: "service-doc", type: "text/markdown" },
       { href: "/.well-known/agent-skills/index.json", rel: "describedby", type: "application/json" },
       { href: "/.well-known/ai-catalog.json", rel: "describedby", type: "application/json" },
       { href: "/privacy.html", rel: "privacy-policy" },
@@ -75,16 +78,17 @@ async function markdownResponse(request: Request, page: Page, originFetch: Origi
   const markdown = await origin.text();
   if (markdown.trim() === "") return null;
 
+  // Not storable anywhere: Cloudflare's cache does not vary on Accept, so a
+  // cached markdown copy under the page URL could be handed to a browser.
   const headers = new Headers({
     "Content-Type": "text/markdown; charset=utf-8",
+    "Cache-Control": "private, no-store",
     "Vary": "Accept",
     "Link": formatLinks(page.links),
     "X-Markdown-Tokens": String(estimateTokens(markdown)),
   });
-  for (const name of ["Cache-Control", "Access-Control-Allow-Origin"]) {
-    const value = origin.headers.get(name);
-    if (value !== null) headers.set(name, value);
-  }
+  const allowOrigin = origin.headers.get("Access-Control-Allow-Origin");
+  if (allowOrigin !== null) headers.set("Access-Control-Allow-Origin", allowOrigin);
   return new Response(request.method === "HEAD" ? null : markdown, { status: 200, headers });
 }
 
@@ -96,7 +100,7 @@ function varyCoversAccept(vary: string | null): boolean {
 
 export async function handle(request: Request, originFetch: OriginFetch): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return originFetch(request);
-  // The query string is ignored here; the exact routes keep query-string URLs away.
+  // The query string is ignored, so "/?sent=1" and "/?utm_source=x" are decorated as "/".
   const page = PAGES[new URL(request.url).pathname];
   if (!page) return originFetch(request);
 

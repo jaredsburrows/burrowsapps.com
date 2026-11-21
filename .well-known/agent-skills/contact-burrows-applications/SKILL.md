@@ -31,7 +31,9 @@ On https://burrowsapps.com/ the page registers a WebMCP tool named `send_contact
 
 ### If you are not in a browser
 
-There is no public API. The form's endpoint, `/api/contact`, accepts submissions only from the form on burrowsapps.com and rejects every other request, so do not post to it directly. Draft the message with the user, then have them send it to contact@burrowsapps.com or through the form.
+- To read facts: `GET https://burrowsapps.com/api/v1/company` and `GET https://burrowsapps.com/api/v1/services` return JSON, and the MCP server at https://burrowsapps.com/mcp offers the same facts as tools. Neither needs a credential. Details: https://burrowsapps.com/developers.md
+- To send a message: draft it with the user, then have them send it to contact@burrowsapps.com or through the form.
+- Do not post to `/api/contact`. It is the contact form's backend, meant only for the form on burrowsapps.com, and it is protected by bot checks and rate limits.
 
 ## What a useful message includes
 

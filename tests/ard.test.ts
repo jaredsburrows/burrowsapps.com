@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { resolveSiteUrl } from "./support/site-map.ts";
 
 const REPO = new URL("../", import.meta.url);
 const CATALOG = new URL(".well-known/ai-catalog.json", REPO);
@@ -52,16 +52,22 @@ test("each entry is well formed", async () => {
   }
 });
 
-test("each entry url points at a file in this repo", async () => {
+test("each entry url is a file in this repo or a Worker path", async () => {
   for (const entry of (await readManifest()).entries) {
     if (entry.url === undefined) continue;
     assert.ok(entry.url.startsWith(SITE), `${entry.url} is not on ${SITE}`);
-    const path = new URL(entry.url).pathname;
-    assert.ok(existsSync(new URL(`.${path}`, REPO)), `${entry.url} has no file in the repo`);
+    assert.notEqual(resolveSiteUrl(entry.url), null, `${entry.url} does not resolve`);
   }
 });
 
 test("entry identifiers are unique", async () => {
   const ids = (await readManifest()).entries.map((entry) => entry.identifier);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test("the MCP server card entry points at the path the Worker serves the card from", async () => {
+  const entry = (await readManifest()).entries.find((candidate) => candidate.type === "application/mcp-server-card+json");
+  assert.ok(entry?.url, "no application/mcp-server-card+json entry");
+  assert.equal(entry.url, "https://burrowsapps.com/mcp/server-card");
+  assert.equal(resolveSiteUrl(entry.url), "worker");
 });
