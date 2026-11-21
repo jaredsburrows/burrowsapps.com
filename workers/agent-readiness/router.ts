@@ -9,6 +9,7 @@
 import { handle as api, catalog } from "./api.ts";
 import { handle } from "./handler.ts";
 import { card, endpoint as mcp } from "./mcp.ts";
+import { oauthDocument } from "./wellknown.ts";
 import { json } from "./http.ts";
 import type { Deps, Env } from "./http.ts";
 
@@ -31,6 +32,8 @@ const ROUTES: Readonly<Record<string, Handler>> = {
   "/mcp": (request, env) => mcp(request, env),
   "/mcp/server-card": async (request, _env, _deps, url) => card(request, url),
   "/.well-known/mcp/server-card.json": async (request, _env, _deps, url) => card(request, url),
+  "/.well-known/oauth-authorization-server": async (request, _env, _deps, url) => oauthDocument(request, url),
+  "/.well-known/oauth-protected-resource": async (request, _env, _deps, url) => oauthDocument(request, url),
 };
 
 export const OWNED_EXACT: readonly string[] = Object.keys(ROUTES);
