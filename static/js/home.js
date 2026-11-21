@@ -61,10 +61,8 @@
     input.addEventListener('input', () => setFieldError(input, ''));
   }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!validate()) return;
-
+  // Shared by the human submit handler and the WebMCP tool below.
+  const send = async () => {
     submit.disabled = true;
     submit.textContent = 'Sending…';
     setStatus('', '');
@@ -85,7 +83,8 @@
     }).catch(() => null);
 
     clearTimeout(timer);
-    if (response && response.ok) {
+    const sent = Boolean(response && response.ok);
+    if (sent) {
       form.reset();
       setStatus('ok', "Message sent — thanks. I'll get back to you soon.");
     } else {
@@ -95,5 +94,12 @@
     }
     submit.disabled = false;
     submit.textContent = 'Send message';
+    return sent;
+  };
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!validate()) return;
+    await send();
   });
 })();
