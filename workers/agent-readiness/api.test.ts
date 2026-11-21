@@ -1,12 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { API_VERSION } from "./api.ts";
+import { existsSync } from "node:fs";
+import { API_VERSION, CATALOG, openapi } from "./api.ts";
 import { COMPANY, SERVICES } from "./facts.ts";
-import { route } from "./router.ts";
+import { isOwned, route } from "./router.ts";
 import { makeBaseEnv, makeDeps, T0 } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
 
 const SITE = "https://burrowsapps.com";
+const REPO = new URL("../../", import.meta.url);
+
+// Temporary until tests/support/site-map.ts exists (T21).
+const resolves = (raw: string): boolean => {
+  const url = new URL(raw);
+  if (url.origin !== SITE) return false;
+  if (isOwned(url.pathname)) return true;
+  const path = url.pathname.endsWith("/") ? `${url.pathname}index.html` : url.pathname;
+  return existsSync(new URL(`.${path}`, REPO));
+};
 
 const call = async (path: string, init: RequestInit = {}, env: TestEnv = makeBaseEnv()) => {
   const deps = makeDeps();
@@ -84,4 +95,86 @@ test("3. the public limiter is keyed by client IP", async () => {
 test("6. company contact options have no inquiryApi while the authorization server is off", async () => {
   const company = await (await call("/api/v1/company")).response.json();
   assert.equal("inquiryApi" in company.contact, false);
+});
+
+type LinkTarget = { href: string; type: string };
+type CatalogEntry = { anchor: string } & Record<string, LinkTarget[] | string>;
+const entries = (CATALOG.linkset as CatalogEntry[]);
+const targets = (entry: CatalogEntry): string[] => [
+  entry.anchor,
+  ...Object.entries(entry).flatMap(([key, value]) => (key === "anchor" ? [] : (value as LinkTarget[]).map((link) => link.href))),
+];
+
+test("4. the catalog is a linkset served as application/linkset+json with the RFC 9727 profile", async () => {
+  const { response, deps } = await call("/.well-known/api-catalog", { headers: { Accept: "application/linkset+json, application/json" } });
+  assert.equal(response.status, 200);
+  const type = response.headers.get("Content-Type") ?? "";
+  assert.ok(type.startsWith("application/linkset+json"), type);
+  assert.ok(type.includes("https://www.rfc-editor.org/info/rfc9727"), type);
+  assert.equal(response.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');
+  const body = await response.json();
+  assert.ok(Array.isArray(body.linkset) && body.linkset.length === 2);
+  for (const entry of body.linkset) {
+    for (const key of ["anchor", "service-desc", "service-doc"]) assert.ok(key in entry, `entry lacks ${key}`);
+  }
+  assert.equal(deps.originCalls.length, 0);
+  const head = (await call("/.well-known/api-catalog", { method: "HEAD" })).response;
+  assert.equal(head.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');
+});
+
+test("4. every link in the API entry of the catalog resolves on the site", { todo: "developers.md arrives in T21" }, async () => {
+  for (const href of targets(entries[0])) assert.ok(resolves(href), `${href} does not resolve`);
+});
+
+test("4. every link in the MCP entry of the catalog resolves on the site", { todo: "/mcp arrives in T22 and T24" }, async () => {
+  for (const href of targets(entries[1])) assert.ok(resolves(href), `${href} does not resolve`);
+});
+
+type OpenApi = {
+  openapi: string;
+  servers: { url: string }[];
+  paths: Record<string, Record<string, unknown>>;
+  components: { schemas: Record<string, unknown>; securitySchemes?: Record<string, unknown> };
+};
+
+const refsIn = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.flatMap(refsIn);
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, inner]) => (key === "$ref" && typeof inner === "string" ? [inner] : refsIn(inner)));
+  }
+  return [];
+};
+
+const resolvePointer = (document: unknown, pointer: string): unknown => {
+  assert.ok(pointer.startsWith("#/"), pointer);
+  return pointer.slice(2).split("/").reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], document);
+};
+
+for (const authOn of [false, true]) {
+  test(`5. the OpenAPI document is consistent (authorization server ${authOn ? "on" : "off"})`, async () => {
+    const document = openapi(authOn) as OpenApi;
+    assert.ok(document.openapi.startsWith("3.1"));
+    for (const pointer of refsIn(document)) assert.ok(resolvePointer(document, pointer) !== undefined, `${pointer} does not resolve`);
+    for (const path of Object.keys(document.paths)) {
+      const url = new URL(`${document.servers[0].url}${path}`);
+      assert.ok(isOwned(url.pathname), `${url.pathname} is not owned by the router`);
+    }
+    assert.equal("/inquiries" in document.paths, authOn);
+    assert.equal(document.components.securitySchemes !== undefined, authOn);
+  });
+}
+
+test("5. every GET path in the OpenAPI document answers 200 through route()", async () => {
+  const document = openapi(false) as OpenApi;
+  for (const [path, operations] of Object.entries(document.paths)) {
+    if (!("get" in operations)) continue;
+    const { response } = await call(new URL(`${document.servers[0].url}${path}`).pathname);
+    assert.equal(response.status, 200, path);
+  }
+});
+
+test("5. the OpenAPI document is served with its media type and without the inquiry path while auth is off", async () => {
+  const { response } = await call("/api/v1/openapi.json");
+  assert.equal(response.headers.get("Content-Type"), "application/vnd.oai.openapi+json");
+  assert.deepEqual(await response.json(), openapi(false));
 });
