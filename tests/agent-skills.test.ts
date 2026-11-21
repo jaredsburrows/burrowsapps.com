@@ -10,6 +10,8 @@ const REPO = new URL("../", import.meta.url);
 const SITE = "https://burrowsapps.com/";
 const INDEX_URL = new URL(".well-known/agent-skills/index.json", SITE);
 const SCHEMA = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
+// auth.md is added in T33; remove this entry there.
+const NOT_YET_PUBLISHED = ["https://burrowsapps.com/auth.md"];
 
 type Skill = { name: string; type: string; description: string; url: string; digest: string };
 type SkillsIndex = { $schema: string; skills: Skill[] };
@@ -86,6 +88,7 @@ test("every burrowsapps.com URL in SKILL.md is a file in the repo or a Worker pa
     for (const raw of urls) {
       const url = new URL(raw.replace(/[.,;:]+$/, ""));
       url.hash = "";
+      if (NOT_YET_PUBLISHED.includes(url.href)) continue;
       assert.notEqual(resolveSiteUrl(url.href), null, `${raw} does not resolve`);
     }
   }
