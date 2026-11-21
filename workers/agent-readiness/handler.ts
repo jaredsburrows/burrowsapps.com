@@ -59,3 +59,63 @@ export function prefersMarkdown(accept: string | null): boolean {
 export function estimateTokens(markdown: string): number {
   return Math.floor(new TextEncoder().encode(markdown).length / 4);
 }
+
+// Fetches the page's markdown file from the origin. Returns null whenever the
+// result is not usable markdown, so the caller can fall back to HTML.
+async function markdownResponse(request: Request, page: Page, originFetch: OriginFetch): Promise<Response | null> {
+  // Built from request.url so a request to www stays on www.
+  const subrequest = new Request(new URL(page.markdown, request.url), {
+    method: "GET",
+    headers: { Accept: "text/markdown" },
+    redirect: "manual",
+  });
+  const origin = await originFetch(subrequest);
+  const contentType = origin.headers.get("Content-Type") ?? "";
+  if (origin.status !== 200 || contentType.toLowerCase().startsWith("text/html")) return null;
+  const markdown = await origin.text();
+  if (markdown.trim() === "") return null;
+
+  const headers = new Headers({
+    "Content-Type": "text/markdown; charset=utf-8",
+    "Vary": "Accept",
+    "Link": formatLinks(page.links),
+    "X-Markdown-Tokens": String(estimateTokens(markdown)),
+  });
+  for (const name of ["Cache-Control", "Access-Control-Allow-Origin"]) {
+    const value = origin.headers.get(name);
+    if (value !== null) headers.set(name, value);
+  }
+  return new Response(request.method === "HEAD" ? null : markdown, { status: 200, headers });
+}
+
+function varyHasAccept(vary: string | null): boolean {
+  return (vary ?? "").split(",").some((token) => token.trim().toLowerCase() === "accept");
+}
+
+export async function handle(request: Request, originFetch: OriginFetch): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD") return originFetch(request);
+  // The query string is ignored here; the exact routes keep query-string URLs away.
+  const page = PAGES[new URL(request.url).pathname];
+  if (!page) return originFetch(request);
+
+  if (prefersMarkdown(request.headers.get("Accept"))) {
+    try {
+      const markdown = await markdownResponse(request, page, originFetch);
+      if (markdown) return markdown;
+    } catch {
+      // Fall through to the HTML page.
+    }
+  }
+
+  // Errors here propagate; the entry point owns the last retry.
+  const response = await originFetch(request);
+  try {
+    if (response.status !== 200 && response.status !== 304) return response;
+    const out = new Response(response.body, response);
+    out.headers.append("Link", formatLinks(page.links));
+    if (!varyHasAccept(out.headers.get("Vary"))) out.headers.append("Vary", "Accept");
+    return out;
+  } catch {
+    return response;
+  }
+}
