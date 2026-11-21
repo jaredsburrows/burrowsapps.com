@@ -29,7 +29,6 @@ const endpointPaths = (text: string): string[] => {
 
 // Items that a later task makes real.
 const PENDING: Record<string, string> = {
-  "https://burrowsapps.com/mcp": "/mcp arrives in T22",
   "https://burrowsapps.com/auth.md": "auth.md arrives in T33",
 };
 

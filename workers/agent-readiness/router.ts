@@ -8,6 +8,7 @@
 
 import { handle as api, catalog } from "./api.ts";
 import { handle } from "./handler.ts";
+import { endpoint as mcp } from "./mcp.ts";
 import { json } from "./http.ts";
 import type { Deps, Env } from "./http.ts";
 
@@ -27,6 +28,7 @@ const ROUTES: Readonly<Record<string, Handler>> = {
   "/api/v1/services": publicApi,
   "/api/v1/status": publicApi,
   "/api/v1/openapi.json": publicApi,
+  "/mcp": (request, env, deps) => mcp(request, env, deps, false),
 };
 
 export const OWNED_EXACT: readonly string[] = Object.keys(ROUTES);
