@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { resolveSiteUrl } from "./support/site-map.ts";
 
 const REPO = new URL("../", import.meta.url);
 const SITE = "https://burrowsapps.com/";
@@ -77,7 +78,7 @@ test("SKILL.md frontmatter matches the index entry and its directory", async () 
   }
 });
 
-test("every burrowsapps.com URL in SKILL.md maps to a file in the repo", async () => {
+test("every burrowsapps.com URL in SKILL.md is a file in the repo or a Worker path", async () => {
   for (const skill of (await readIndex()).skills) {
     const text = await readFile(repoFileFor(new URL(skill.url, INDEX_URL)), "utf8");
     const urls = text.match(/https:\/\/burrowsapps\.com\/[^\s)`]*/g) ?? [];
@@ -85,8 +86,7 @@ test("every burrowsapps.com URL in SKILL.md maps to a file in the repo", async (
     for (const raw of urls) {
       const url = new URL(raw.replace(/[.,;:]+$/, ""));
       url.hash = "";
-      const file = repoFileFor(url);
-      assert.ok(existsSync(file), `${raw} has no file at ${fileURLToPath(file)}`);
+      assert.notEqual(resolveSiteUrl(url.href), null, `${raw} does not resolve`);
     }
   }
 });

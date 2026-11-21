@@ -44,6 +44,9 @@ test("formatLinks renders the homepage links exactly", async () => {
   assert.equal(
     formatLinks(PAGES["/"].links),
     '</index.md>; rel="alternate"; type="text/markdown", '
+      + '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json", '
+      + '</api/v1/openapi.json>; rel="service-desc"; type="application/vnd.oai.openapi+json", '
+      + '</developers.md>; rel="service-doc"; type="text/markdown", '
       + '</.well-known/agent-skills/index.json>; rel="describedby"; type="application/json", '
       + '</.well-known/ai-catalog.json>; rel="describedby"; type="application/json", '
       + '</privacy.html>; rel="privacy-policy"',

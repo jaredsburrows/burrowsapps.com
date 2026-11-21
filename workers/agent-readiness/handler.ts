@@ -7,13 +7,16 @@ export type OriginFetch = (request: Request) => Promise<Response>;
 export type PageLink = { href: string; rel: string; type?: string };
 export type Page = { markdown: string; links: readonly PageLink[] };
 
-// Only IANA-registered relations, each pointing at a file in this repo.
-// Targets are path-absolute so the same value is right on apex and www.
+// Only IANA-registered relations, each pointing at a file in this repo or a
+// path this Worker serves. Targets are path-absolute.
 export const PAGES: Readonly<Record<string, Page>> = {
   "/": {
     markdown: "/index.md",
     links: [
       { href: "/index.md", rel: "alternate", type: "text/markdown" },
+      { href: "/.well-known/api-catalog", rel: "api-catalog", type: "application/linkset+json" },
+      { href: "/api/v1/openapi.json", rel: "service-desc", type: "application/vnd.oai.openapi+json" },
+      { href: "/developers.md", rel: "service-doc", type: "text/markdown" },
       { href: "/.well-known/agent-skills/index.json", rel: "describedby", type: "application/json" },
       { href: "/.well-known/ai-catalog.json", rel: "describedby", type: "application/json" },
       { href: "/privacy.html", rel: "privacy-policy" },

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { resolveSiteUrl } from "../../tests/support/site-map.ts";
 import { API_VERSION, CATALOG, openapi } from "./api.ts";
 import { COMPANY, SERVICES } from "./facts.ts";
 import { isOwned, route } from "./router.ts";
@@ -8,16 +8,6 @@ import { makeBaseEnv, makeDeps, T0 } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
 
 const SITE = "https://burrowsapps.com";
-const REPO = new URL("../../", import.meta.url);
-
-// Temporary until tests/support/site-map.ts exists (T21).
-const resolves = (raw: string): boolean => {
-  const url = new URL(raw);
-  if (url.origin !== SITE) return false;
-  if (isOwned(url.pathname)) return true;
-  const path = url.pathname.endsWith("/") ? `${url.pathname}index.html` : url.pathname;
-  return existsSync(new URL(`.${path}`, REPO));
-};
 
 const call = async (path: string, init: RequestInit = {}, env: TestEnv = makeBaseEnv()) => {
   const deps = makeDeps();
@@ -122,12 +112,12 @@ test("4. the catalog is a linkset served as application/linkset+json with the RF
   assert.equal(head.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');
 });
 
-test("4. every link in the API entry of the catalog resolves on the site", { todo: "developers.md arrives in T21" }, async () => {
-  for (const href of targets(entries[0])) assert.ok(resolves(href), `${href} does not resolve`);
+test("4. every link in the API entry of the catalog resolves on the site", async () => {
+  for (const href of targets(entries[0])) assert.notEqual(resolveSiteUrl(href), null, `${href} does not resolve`);
 });
 
 test("4. every link in the MCP entry of the catalog resolves on the site", { todo: "/mcp arrives in T22 and T24" }, async () => {
-  for (const href of targets(entries[1])) assert.ok(resolves(href), `${href} does not resolve`);
+  for (const href of targets(entries[1])) assert.notEqual(resolveSiteUrl(href), null, `${href} does not resolve`);
 });
 
 type OpenApi = {

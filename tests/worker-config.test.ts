@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { PAGES } from "../workers/agent-readiness/handler.ts";
+import { resolveSiteUrl } from "./support/site-map.ts";
 
 const REPO = new URL("../", import.meta.url);
 const AGENT_CONFIG = new URL("workers/agent-readiness/wrangler.jsonc", REPO);
@@ -79,9 +80,9 @@ test("every markdown file in PAGES exists in the repo", async () => {
   }
 });
 
-test("every link target in PAGES exists in the repo", async () => {
+test("every link target in PAGES is a file in the repo or a Worker path", async () => {
   for (const page of Object.values(PAGES)) {
-    for (const link of page.links) assert.ok(existsSync(repoFile(link.href)), `${link.href} does not exist`);
+    for (const link of page.links) assert.notEqual(resolveSiteUrl(link.href), null, `${link.href} does not resolve`);
   }
 });
 
