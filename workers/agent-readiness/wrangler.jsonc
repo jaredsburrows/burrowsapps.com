@@ -1,49 +1,59 @@
 {
-  // Schema is fetched over the network for the same reason as workers/contact:
-  // no package manifest at the root and no install step, so no local wrangler.
   "$schema": "https://unpkg.com/wrangler/config-schema.json",
   // Agent-readiness edge Worker for burrowsapps.com. It sits in front of GitHub
-  // Pages for two pages and does the two things Pages cannot:
-  //   1. adds Link response headers (RFC 8288) pointing at the markdown versions
-  //      and the /.well-known/ discovery files;
-  //   2. answers with /index.md or /privacy.md when the Accept header prefers
-  //      text/markdown.
-  // It fails open: on any error the visitor gets the origin's response untouched.
+  // Pages and does what Pages cannot:
+  //   1. adds Link response headers and serves markdown for "/" and "/privacy.html";
+  //   2. serves a small public JSON API, its OpenAPI document, and an RFC 9727 catalog;
+  //   3. serves a read-only MCP server at /mcp and its server card;
+  //   4. runs a small OAuth 2.1 authorization server and the one endpoint it protects,
+  //      POST /api/v1/inquiries, which emails a project inquiry to the owner.
+  // Everything else is passed to the origin untouched, and those paths fail open.
   //
-  // Deploy by hand, after the change is merged and Pages has published:
-  //   npx wrangler deploy --config workers/agent-readiness/wrangler.jsonc
-  // Remove (restores the previous behavior exactly):
-  //   npx wrangler delete --config workers/agent-readiness/wrangler.jsonc
+  // Deploy:  npx wrangler deploy --config workers/agent-readiness/wrangler.jsonc
+  // Remove:  npx wrangler delete --config workers/agent-readiness/wrangler.jsonc
+  //
+  // Part 4 is off until the signing key exists (and is off again if it is deleted):
+  //   node workers/agent-readiness/tools/new-signing-key.ts | npx wrangler secret put OAUTH_SIGNING_KEY --config workers/agent-readiness/wrangler.jsonc
+  //   npx wrangler secret delete OAUTH_SIGNING_KEY --config workers/agent-readiness/wrangler.jsonc
+  // Optional bot check on the approval page: set the TURNSTILE_SECRET secret and add
+  //   "vars": { "TURNSTILE_SITE_KEY": "<site key>" }
   "name": "burrowsapps-agent-readiness",
-  // Same account as workers/contact -- it owns the burrowsapps.com zone.
   "account_id": "23fd1f78e6c723b48b52bd073092907a",
   "main": "index.ts",
-  // Same date as workers/contact, so both Workers run one runtime behavior.
   "compatibility_date": "2026-07-01",
   "observability": { "enabled": true },
-  // Routes only: no workers.dev hostname and no preview URLs.
   "workers_dev": false,
   "preview_urls": false,
-  // Exact-match patterns on purpose -- no wildcards.
+  // One wildcard route. A route matches a query string only if it ends in "*",
+  // so this is also what lets "/?utm_source=x" get the Link header and markdown.
   //
-  // Cloudflare matches a route against the whole URL including the query
-  // string, and a pattern matches a query string only if it ends in "*". So
-  // these match "/" and "/privacy.html" and nothing else:
-  //   - /?sent=1 and /?error=1 (the contact form's no-JS redirects) bypass this
-  //     Worker and go straight to Pages;
-  //   - /api/contact* is never matched, so workers/contact is unaffected;
-  //   - CSS, JS, images, and 404s never run a Worker.
-  // The price: a URL such as /?utm_source=x gets no Link header and no markdown.
+  // workers/contact keeps /api/contact*: Cloudflare picks the most specific
+  // matching route, and its pattern is longer than "/*". The second route below
+  // exists because an old dashboard route "burrowsapps.com/api/*" may still point
+  // at the contact Worker; "/api/v1*" is more specific than that one.
   //
-  // www is listed because www.burrowsapps.com is served by Pages in its own
-  // right (see workers/contact/wrangler.jsonc).
+  // www is not routed: www.burrowsapps.com/ redirects to the apex at the origin.
   //
-  // After each deploy, set "Request limit failure mode" to "Fail open" on all
-  // four routes in the dashboard. Wrangler has no setting for it.
+  // After each deploy, set "Request limit failure mode" to "Fail open" on both
+  // routes in the dashboard. Wrangler has no setting for it.
   "routes": [
-    { "pattern": "burrowsapps.com/", "zone_name": "burrowsapps.com" },
-    { "pattern": "www.burrowsapps.com/", "zone_name": "burrowsapps.com" },
-    { "pattern": "burrowsapps.com/privacy.html", "zone_name": "burrowsapps.com" },
-    { "pattern": "www.burrowsapps.com/privacy.html", "zone_name": "burrowsapps.com" }
+    { "pattern": "burrowsapps.com/*", "zone_name": "burrowsapps.com" },
+    { "pattern": "burrowsapps.com/api/v1*", "zone_name": "burrowsapps.com" }
+  ],
+  // Same locked destination as workers/contact. This Worker cannot email anyone else.
+  "send_email": [
+    { "name": "INQUIRY_EMAIL", "allowed_destination_addresses": ["burrowsapps+contactform@gmail.com"] }
+  ],
+  // Limits are per Cloudflare location and approximate, like the contact Worker's.
+  //   PUBLIC_LIMITER   60/min per IP: /api/v1 and POST /mcp
+  //   AUTH_LIMITER     10/min per IP and operation: register, authorize page, token
+  //   APPROVE_LIMITER   3/min per IP and 3/min overall: approvals
+  //   ONCE_LIMITER      1/min per key: one inquiry per approval, one inquiry overall,
+  //                     and one redemption per authorization code
+  "ratelimits": [
+    { "name": "PUBLIC_LIMITER", "namespace_id": "2001", "simple": { "limit": 60, "period": 60 } },
+    { "name": "AUTH_LIMITER", "namespace_id": "2002", "simple": { "limit": 10, "period": 60 } },
+    { "name": "APPROVE_LIMITER", "namespace_id": "2003", "simple": { "limit": 3, "period": 60 } },
+    { "name": "ONCE_LIMITER", "namespace_id": "2004", "simple": { "limit": 1, "period": 60 } }
   ]
 }
