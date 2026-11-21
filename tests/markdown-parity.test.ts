@@ -60,6 +60,17 @@ const ENTITIES: Readonly<Record<string, string>> = {
 const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
 const normalize = (text: string): string => collapse(text).toLowerCase();
 
+// Loops until stable so that removing one tag can never leave another behind.
+const stripTags = (html: string): string => {
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = previous.replace(/<[^>]+>/g, "");
+  } while (current !== previous);
+  return current;
+};
+
 const mainOf = (html: string): string => {
   const match = html.match(/<main\b[^>]*>([\s\S]*)<\/main>/i);
   assert.ok(match, "no <main> element");
@@ -70,7 +81,7 @@ const mainOf = (html: string): string => {
 const htmlBlockText = (main: string): string[] =>
   [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
     .map(([, , inner]) =>
-      collapse(inner.replace(/<[^>]+>/g, "").replace(/&(amp|nbsp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity])),
+      collapse(stripTags(inner).replace(/&(amp|nbsp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity])),
     )
     .filter((block) => block !== "");
 
