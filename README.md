@@ -82,7 +82,9 @@ npx wrangler deploy --config workers/agent-readiness/wrangler.jsonc
 
 After each deploy, open both routes in the Cloudflare dashboard and set "Request limit failure mode" to "Fail open". Wrangler has no setting for it. If the four old exact routes (`burrowsapps.com/`, `www.burrowsapps.com/`, and the two `/privacy.html` ones) are still listed, delete them.
 
-Every request to the apex now runs the Worker, and it counts against the account's 100,000 requests a day on Workers Free, shared with the contact form. With both routes set to fail open, going over the limit leaves the site unaffected; the API, the MCP server, and the OAuth documents answer `404` from Pages until the next day.
+Every request to the apex now runs the Worker, including assets, and it counts against the account's 100,000 requests a day on Workers Free. That limit is per account and shared with the contact Worker. When it is used up, the contact form stops working until the daily reset, and the API, the MCP server, the OAuth documents, and the markdown variant are unavailable; with both routes set to fail open, the pages themselves stay up.
+
+If usage ever gets close to the limit, add a route `burrowsapps.com/static/*` with Worker set to "None" in the dashboard, so assets skip the Worker.
 
 Remove it (the site then behaves as before iteration 1):
 
