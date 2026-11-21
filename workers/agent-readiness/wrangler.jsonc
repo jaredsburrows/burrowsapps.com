@@ -1,0 +1,49 @@
+{
+  // Schema is fetched over the network for the same reason as workers/contact:
+  // no package manifest at the root and no install step, so no local wrangler.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  // Agent-readiness edge Worker for burrowsapps.com. It sits in front of GitHub
+  // Pages for two pages and does the two things Pages cannot:
+  //   1. adds Link response headers (RFC 8288) pointing at the markdown versions
+  //      and the /.well-known/ discovery files;
+  //   2. answers with /index.md or /privacy.md when the Accept header prefers
+  //      text/markdown.
+  // It fails open: on any error the visitor gets the origin's response untouched.
+  //
+  // Deploy by hand, after the change is merged and Pages has published:
+  //   npx wrangler deploy --config workers/agent-readiness/wrangler.jsonc
+  // Remove (restores the previous behavior exactly):
+  //   npx wrangler delete --config workers/agent-readiness/wrangler.jsonc
+  "name": "burrowsapps-agent-readiness",
+  // Same account as workers/contact -- it owns the burrowsapps.com zone.
+  "account_id": "23fd1f78e6c723b48b52bd073092907a",
+  "main": "index.ts",
+  // Same date as workers/contact, so both Workers run one runtime behavior.
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true },
+  // Routes only: no workers.dev hostname and no preview URLs.
+  "workers_dev": false,
+  "preview_urls": false,
+  // Exact-match patterns on purpose -- no wildcards.
+  //
+  // Cloudflare matches a route against the whole URL including the query
+  // string, and a pattern matches a query string only if it ends in "*". So
+  // these match "/" and "/privacy.html" and nothing else:
+  //   - /?sent=1 and /?error=1 (the contact form's no-JS redirects) bypass this
+  //     Worker and go straight to Pages;
+  //   - /api/contact* is never matched, so workers/contact is unaffected;
+  //   - CSS, JS, images, and 404s never run a Worker.
+  // The price: a URL such as /?utm_source=x gets no Link header and no markdown.
+  //
+  // www is listed because www.burrowsapps.com is served by Pages in its own
+  // right (see workers/contact/wrangler.jsonc).
+  //
+  // After each deploy, set "Request limit failure mode" to "Fail open" on all
+  // four routes in the dashboard. Wrangler has no setting for it.
+  "routes": [
+    { "pattern": "burrowsapps.com/", "zone_name": "burrowsapps.com" },
+    { "pattern": "www.burrowsapps.com/", "zone_name": "burrowsapps.com" },
+    { "pattern": "burrowsapps.com/privacy.html", "zone_name": "burrowsapps.com" },
+    { "pattern": "www.burrowsapps.com/privacy.html", "zone_name": "burrowsapps.com" }
+  ]
+}
