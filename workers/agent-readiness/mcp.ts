@@ -92,6 +92,7 @@ export const CARD: Record<string, unknown> = {
   transport: { type: "streamable-http", endpoint: `https://burrowsapps.com${ENDPOINT_PATH}` },
   capabilities: CAPABILITIES,
   authentication: { type: "none" },
+  tools: TOOLS.map(({ name, description }) => ({ name, description })),
 };
 
 const CARD_BODY = JSON.stringify(CARD);

@@ -402,3 +402,10 @@ test("card: serverInfo, versions, and capabilities match what the server answers
   assert.equal(CARD.version, discover._meta[META_SERVER_INFO].version);
   assert.equal(CARD.protocolVersion, MODERN_VERSION);
 });
+
+test("card: the tools listed are exactly the tools tools/list returns", async () => {
+  const listed = (await expectComplete(await send(modern("tools/list")))).tools as { name: string; description: string }[];
+  assert.deepEqual(CARD.tools, listed.map(({ name, description }) => ({ name, description })));
+  const legacyListed = (await legacyResult(await send(legacy("tools/list")))).tools as { name: string; description: string }[];
+  assert.deepEqual(CARD.tools, legacyListed.map(({ name, description }) => ({ name, description })));
+});
