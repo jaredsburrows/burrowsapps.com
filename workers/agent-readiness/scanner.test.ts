@@ -51,7 +51,10 @@ test("apiCatalog: a linkset whose entries have anchor, service-desc, and service
   assert.equal(response.headers.get("Content-Type"), "application/linkset+json");
   const body = await jsonOf(response);
   assert.ok(nonEmptyArray(body.linkset));
-  for (const entry of body.linkset) {
+  const apis = body.linkset.filter((entry: Record<string, unknown>) => !("item" in entry));
+  assert.ok(apis.length >= 1);
+  for (const entry of body.linkset) assert.ok("anchor" in entry);
+  for (const entry of apis) {
     for (const key of ["anchor", "service-desc", "service-doc"]) assert.ok(key in entry, key);
   }
 });

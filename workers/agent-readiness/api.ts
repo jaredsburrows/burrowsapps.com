@@ -98,8 +98,16 @@ export function openapi(): Record<string, unknown> {
 }
 
 // RFC 9727 API catalog in the RFC 9264 linkset format.
+// The first entry is the catalog itself, listing each API as an item.
 export const CATALOG: Record<string, unknown> = {
   linkset: [
+    {
+      anchor: "https://burrowsapps.com/.well-known/api-catalog",
+      item: [
+        { href: BASE, title: "Burrows Applications public API" },
+        { href: "https://burrowsapps.com/mcp", title: "Burrows Applications MCP server" },
+      ],
+    },
     {
       anchor: BASE,
       "service-desc": [{ href: `${BASE}/openapi.json`, type: OPENAPI_TYPE }],
