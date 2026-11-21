@@ -182,6 +182,33 @@ function modern(request: Request, message: Message, params: Record<string, unkno
   }
 }
 
+// 2025-03-26 to 2025-11-25: JSON-RPC errors travel with HTTP 200. No state is
+// kept, so a client that skips initialize is still served.
+function legacy(message: Message, params: Record<string, unknown>, authOn: boolean): Response {
+  if (message.id === undefined) return accepted();
+  const id = message.id;
+  switch (message.method) {
+    case "initialize": {
+      const requested = params.protocolVersion;
+      const protocolVersion = typeof requested === "string" && (LEGACY_VERSIONS as readonly string[]).includes(requested)
+        ? requested
+        : "2025-11-25";
+      return rpcResult(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: SERVER, instructions: INSTRUCTIONS });
+    }
+    case "ping":
+      return rpcResult(id, {});
+    case "tools/list":
+      return rpcResult(id, { tools: TOOLS });
+    case "tools/call": {
+      const result = callTool(params, authOn);
+      if (result === null) return rpcError(id, -32602, "Unknown tool", 200);
+      return rpcResult(id, result);
+    }
+    default:
+      return rpcError(id, -32601, "Method not found", 200);
+  }
+}
+
 export async function endpoint(request: Request, env: Env, _deps: Deps, authOn: boolean): Promise<Response> {
   if (request.method === "OPTIONS") {
     return preflight("POST, OPTIONS", "Content-Type, Accept, MCP-Protocol-Version, Mcp-Method, Mcp-Name, Mcp-Session-Id");
@@ -220,5 +247,5 @@ export async function endpoint(request: Request, env: Env, _deps: Deps, authOn: 
   const header = request.headers.get("MCP-Protocol-Version");
   const isModern = typeof metaVersion === "string" || (header !== null && !(LEGACY_VERSIONS as readonly string[]).includes(header));
   if (isModern) return modern(request, message, params, authOn);
-  return rpcError(message.id, -32601, "Method not found", 200);
+  return legacy(message, params, authOn);
 }

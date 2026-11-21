@@ -258,3 +258,85 @@ test("transport: a refusing limiter is 429 with Retry-After", async () => {
   assert.equal(response.headers.get("Retry-After"), "60");
   await expectError(response, 429, 429);
 });
+
+// Legacy
+
+const legacy = (method: string, params?: Record<string, unknown>, id: number | null = 1, headers: Record<string, string> = {}): RequestInit => {
+  const body: Record<string, unknown> = { jsonrpc: "2.0", method };
+  if (params !== undefined) body.params = params;
+  if (id !== null) body.id = id;
+  return post(body, headers);
+};
+
+const legacyResult = async (response: Response): Promise<Record<string, any>> => {
+  assert.equal(response.status, 200);
+  const body = await rpc(response);
+  assert.ok(body.result, JSON.stringify(body));
+  assert.equal(body.result.resultType, undefined);
+  assert.equal(body.result._meta, undefined);
+  return body.result;
+};
+
+const initialize = (protocolVersion: string): RequestInit =>
+  legacy("initialize", { protocolVersion, capabilities: {}, clientInfo: { name: "test", version: "1" } });
+
+for (const version of ["2025-11-25", "2025-06-18", "2025-03-26"]) {
+  test(`legacy: initialize with ${version} echoes the version`, async () => {
+    const response = await send(initialize(version));
+    assert.equal(response.headers.get("Mcp-Session-Id"), null);
+    const result = await legacyResult(response);
+    assert.equal(result.protocolVersion, version);
+    assert.deepEqual(result.serverInfo, SERVER);
+    assert.deepEqual(result.capabilities, { tools: { listChanged: false } });
+    assert.equal(typeof result.instructions, "string");
+  });
+}
+
+for (const version of ["2024-11-05", "2026-07-28"]) {
+  test(`legacy: initialize with ${version} and no _meta answers 2025-11-25`, async () => {
+    assert.equal((await legacyResult(await send(initialize(version)))).protocolVersion, "2025-11-25");
+  });
+}
+
+test("legacy: notifications/initialized is 202 with an empty body", async () => {
+  const response = await send(legacy("notifications/initialized", undefined, null));
+  assert.equal(response.status, 202);
+  assert.equal(await response.text(), "");
+});
+
+test("legacy: ping is an empty result", async () => {
+  assert.deepEqual(await legacyResult(await send(legacy("ping"))), {});
+});
+
+for (const headers of [{}, { "MCP-Protocol-Version": "2025-06-18" }]) {
+  const label = Object.keys(headers).length ? "with" : "without";
+  test(`legacy: tools/list and tools/call work ${label} a version header`, async () => {
+    assert.deepEqual((await legacyResult(await send(legacy("tools/list", {}, 1, headers)))).tools, TOOLS);
+    const call = await legacyResult(await send(legacy("tools/call", { name: "list_services", arguments: {} }, 2, headers)));
+    assert.deepEqual(call.structuredContent, { services: SERVICES });
+    assert.equal(call.isError, false);
+  });
+}
+
+test("legacy: an unknown tool is -32602 with HTTP 200", async () => {
+  await expectError(await send(legacy("tools/call", { name: "nope" })), 200, -32602);
+});
+
+test("legacy: an unknown method is -32601 with HTTP 200", async () => {
+  await expectError(await send(legacy("resources/list")), 200, -32601);
+});
+
+test("legacy: a whole session in order", async () => {
+  const init = await legacyResult(await send(initialize("2025-06-18")));
+  assert.equal(init.protocolVersion, "2025-06-18");
+  const headers = { "MCP-Protocol-Version": "2025-06-18" };
+  assert.equal((await send(legacy("notifications/initialized", undefined, null, headers))).status, 202);
+  assert.equal((await legacyResult(await send(legacy("tools/list", {}, 2, headers)))).tools.length, 3);
+  const call = await legacyResult(await send(legacy("tools/call", { name: "get_company_profile" }, 3, headers)));
+  assert.deepEqual(call.structuredContent, { ...COMPANY });
+});
+
+test("legacy: tools/call with no prior initialize is served", async () => {
+  const call = await legacyResult(await send(legacy("tools/call", { name: "get_contact_options" })));
+  assert.deepEqual(call.structuredContent, contactOptions(false));
+});
