@@ -89,8 +89,9 @@ export const CARD: Record<string, unknown> = {
   ],
   serverInfo: { name: SERVER.name, title: SERVER.title, version: SERVER.version },
   protocolVersion: MODERN_VERSION,
-  transport: { type: "streamable-http", endpoint: ENDPOINT_PATH },
+  transport: { type: "streamable-http", endpoint: `https://burrowsapps.com${ENDPOINT_PATH}` },
   capabilities: CAPABILITIES,
+  authentication: { type: "none" },
 };
 
 const CARD_BODY = JSON.stringify(CARD);
