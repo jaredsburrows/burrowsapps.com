@@ -267,7 +267,7 @@ test("execute ignores non-string field values", async () => {
 
 // B2: the tool bypasses the disabled button, so a second call, or a call during a
 // human submit, posts a second message.
-test("execute while a send is in flight does not post a second message", { todo: "B2" }, async () => {
+test("execute while a send is in flight does not post a second message", async () => {
   const { dom, tool } = registeredTool();
   let release!: () => void;
   dom.fetchGate = new Promise<void>((resolve) => {
@@ -278,6 +278,73 @@ test("execute while a send is in flight does not post a second message", { todo:
   release();
   await Promise.all([first, second]);
   assert.equal(dom.fetchCalls.length, 1);
+});
+
+const holdFetch = (dom: FakeDom): (() => void) => {
+  let release!: () => void;
+  dom.fetchGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return () => release();
+};
+
+// Fields and the button are checked synchronously after each overlapping call,
+// before the held fetch is released, so a regression fails instead of hanging.
+test("a second execute during a tool send is busy and leaves the first message alone", async () => {
+  const { dom, tool } = registeredTool();
+  const release = holdFetch(dom);
+  const first = tool.execute({ ...VALID });
+  const second = tool.execute({ name: "Someone Else", email: "else@example.com", message: "Other text" });
+  try {
+    assert.equal(dom.fields.name.value, VALID.name);
+    assert.equal(dom.fields.message.value, VALID.message);
+    assert.equal(dom.submit.disabled, true);
+    assert.equal(dom.submit.textContent, "Sending…");
+  } finally {
+    release();
+  }
+  const [firstResult, secondResult] = (await Promise.all([first, second])).map(plain);
+  assert.equal(firstResult.status, "sent");
+  assert.equal(secondResult.status, "busy");
+  assert.ok(String(secondResult.message).length > 0);
+  assert.equal(dom.fetchCalls.length, 1);
+  assert.deepEqual(dom.fetchCalls[0].fields, VALID);
+});
+
+test("execute during a human submit is busy and sends nothing", async () => {
+  const { dom, tool } = registeredTool();
+  fillValid(dom);
+  const release = holdFetch(dom);
+  const human = dom.submitForm();
+  const agent = tool.execute({ name: "Agent", email: "agent@example.com", message: "Hi" });
+  try {
+    assert.equal(dom.fields.name.value, VALID.name);
+  } finally {
+    release();
+  }
+  await human;
+  assert.equal(plain(await agent).status, "busy");
+  assert.equal(dom.fetchCalls.length, 1);
+  assert.equal(dom.status.innerHTML, SENT_STATUS);
+});
+
+test("a human submit during a tool send posts nothing more", async () => {
+  const { dom, tool } = registeredTool();
+  const release = holdFetch(dom);
+  const sent = tool.execute({ ...VALID });
+  const human = dom.submitForm();
+  release();
+  await Promise.all([sent, human]);
+  assert.equal(dom.fetchCalls.length, 1);
+});
+
+test("execute works again once the earlier send has finished", async () => {
+  const { dom, tool } = registeredTool();
+  dom.fetchBehavior = "not-ok";
+  assert.equal(plain(await tool.execute({ ...VALID })).status, "failed");
+  dom.fetchBehavior = "ok";
+  assert.equal(plain(await tool.execute({ ...VALID })).status, "sent");
+  assert.equal(dom.fetchCalls.length, 2);
 });
 
 // B3: whitespace-only values pass validity (valueMissing ignores spaces) and are

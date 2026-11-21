@@ -61,8 +61,13 @@
     input.addEventListener('input', () => setFieldError(input, ''));
   }
 
+  // Set while a send is in flight. The disabled button stops a second human
+  // submit; this also stops the WebMCP tool, which never clicks the button.
+  let sending = false;
+
   // Shared by the human submit handler and the WebMCP tool below.
   const send = async () => {
+    sending = true;
     submit.disabled = true;
     submit.textContent = 'Sending…';
     setStatus('', '');
@@ -94,12 +99,13 @@
     }
     submit.disabled = false;
     submit.textContent = 'Send message';
+    sending = false;
     return sent;
   };
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (!validate()) return;
+    if (sending || !validate()) return;
     await send();
   });
 
@@ -108,6 +114,11 @@
   // absent. document.modelContext is the current entry point; older Chrome
   // builds used navigator.modelContext.
   const runTool = async (input) => {
+    // Checked before the fields are filled, so a second call cannot overwrite
+    // the message that is being sent.
+    if (sending) {
+      return { status: 'busy', message: 'Another message is being sent. Wait for it to finish, then try again.' };
+    }
     const values = input && typeof input === 'object' ? input : {};
     for (const name of FIELDS) {
       form.elements[name].value = typeof values[name] === 'string' ? values[name] : '';
