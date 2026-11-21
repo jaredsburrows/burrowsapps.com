@@ -109,7 +109,7 @@ test("auth.md's statements about the contact endpoint are in the contact Worker"
 test("the docs do not describe how the contact endpoint's checks respond", async () => {
   const skill = await read(".well-known/agent-skills/contact-burrows-applications/SKILL.md");
   for (const [name, text] of [["auth.md", authMd], ["developers.md", developers], ["SKILL.md", skill]] as const) {
-    for (const phrase of [/\b403\b/, /not callable/i, /no program/i, /only from the form/i, /rejects every other/i, /Origin` header/]) {
+    for (const phrase of [/\b403\b/, /not callable/i, /no program/i, /only from the form/i, /rejects every other/i, /Origin` header/, /refusals? (is|are)/i]) {
       assert.ok(!phrase.test(text), `${name} matches ${phrase}`);
     }
   }

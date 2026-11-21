@@ -24,7 +24,7 @@ No path named anywhere in this document is a registration endpoint. If a discove
 
 ## The contact form endpoint
 
-`POST /api/contact` is the backend of the contact form at [`/#contact`](/#contact). It is meant only for that form, and it is protected by bot checks and rate limits, not by any identity system: there is no credential, token, or API key for it, and none would be accepted. Its refusals are a `404`, not a `401`.
+`POST /api/contact` is the backend of the contact form at [`/#contact`](/#contact). It is meant only for that form, and it is protected by bot checks and rate limits, not by any identity system: there is no credential, token, or API key for it, and none would be accepted.
 
 Agents should not call it. If a person is present, send them to [the contact form](/#contact) or to contact@burrowsapps.com. In the person's browser, the homepage also registers a WebMCP tool named `send_contact_message` that fills in and submits that same form.
 
