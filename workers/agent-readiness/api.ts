@@ -6,7 +6,7 @@ import type { Deps, Env } from "./http.ts";
 
 export const API_VERSION = "1.0.0";
 export const OPENAPI_TYPE = "application/vnd.oai.openapi+json";
-export const CATALOG_TYPE = 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"';
+export const CATALOG_TYPE = "application/linkset+json";
 const BASE = "https://burrowsapps.com/api/v1";
 const JSON_TYPE = "application/json";
 const DOCS = "https://burrowsapps.com/developers.md";

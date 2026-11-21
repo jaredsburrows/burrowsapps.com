@@ -1,6 +1,6 @@
 // Replays, against route(), the pass criteria that the isitagentready.com
 // scanner documents for each check this branch adds, with the request shapes
-// its scan of the owner's other site (which passes all of them) recorded.
+// the scanner's own scans recorded.
 // It catches format mistakes against the documented criteria only; how
 // strictly the live scanner checks beyond them is not known.
 
@@ -48,7 +48,7 @@ test("linkHeaders: the homepage Link header has api-catalog, and its target answ
 
 test("apiCatalog: a linkset whose entries have anchor, service-desc, and service-doc", async () => {
   const response = await scan(`${SITE}/.well-known/api-catalog`, { Accept: "application/linkset+json, application/json" });
-  assert.ok((response.headers.get("Content-Type") ?? "").startsWith("application/linkset+json"));
+  assert.equal(response.headers.get("Content-Type"), "application/linkset+json");
   const body = await jsonOf(response);
   assert.ok(nonEmptyArray(body.linkset));
   for (const entry of body.linkset) {

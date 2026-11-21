@@ -109,7 +109,7 @@ DNS > Records > Add record:
 | Value | `alpn="h2,h3" port=443` |
 | TTL | `5 min` |
 
-It says the site's agent index (`/.well-known/ard.json`) is served by `burrowsapps.com` on port 443. It mirrors the record that passes on thecigarguys.com. Check it after saving:
+It says the site's agent index (`/.well-known/ard.json`) is served by `burrowsapps.com` on port 443. Check it after saving:
 
 ```
 curl -s -H 'accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=_index._agents.burrowsapps.com&type=SVCB&do=1'
@@ -140,7 +140,7 @@ curl -s -X POST https://burrowsapps.com/mcp -H 'Content-Type: application/json' 
 curl -s https://burrowsapps.com/.well-known/agent-skills/contact-burrows-applications/SKILL.md | shasum -a 256
 ```
 
-Expected, in order: a `Link` line that includes `rel="api-catalog"`; a markdown content type, `private, no-store`, a `vary` that includes `Accept`, and a token count; a markdown content type; `text/html`; `application/linkset+json` with the RFC 9727 profile; `{"status":"ok",...}`; `application/json`; `application/json`; a JSON-RPC result with `"resultType":"complete"`; the digest from `.well-known/agent-skills/index.json`.
+Expected, in order: a `Link` line that includes `rel="api-catalog"`; a markdown content type, `private, no-store`, a `vary` that includes `Accept`, and a token count; a markdown content type; `text/html`; `application/linkset+json`; `{"status":"ok",...}`; `application/json`; `application/json`; a JSON-RPC result with `"resultType":"complete"`; the digest from `.well-known/agent-skills/index.json`.
 
 #### The markdown probe log
 

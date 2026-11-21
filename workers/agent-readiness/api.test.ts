@@ -95,12 +95,11 @@ const targets = (entry: CatalogEntry): string[] => [
   ...Object.entries(entry).flatMap(([key, value]) => (key === "anchor" ? [] : (value as LinkTarget[]).map((link) => link.href))),
 ];
 
-test("4. the catalog is a linkset served as application/linkset+json with the RFC 9727 profile", async () => {
+test("4. the catalog is a linkset served as plain application/linkset+json", async () => {
   const { response, deps } = await call("/.well-known/api-catalog", { headers: { Accept: "application/linkset+json, application/json" } });
   assert.equal(response.status, 200);
   const type = response.headers.get("Content-Type") ?? "";
-  assert.ok(type.startsWith("application/linkset+json"), type);
-  assert.ok(type.includes("https://www.rfc-editor.org/info/rfc9727"), type);
+  assert.equal(type, "application/linkset+json");
   assert.equal(response.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');
   const body = await response.json();
   assert.ok(Array.isArray(body.linkset) && body.linkset.length === 2);
