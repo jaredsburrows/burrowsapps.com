@@ -78,16 +78,17 @@ async function markdownResponse(request: Request, page: Page, originFetch: Origi
   const markdown = await origin.text();
   if (markdown.trim() === "") return null;
 
+  // Not storable anywhere: Cloudflare's cache does not vary on Accept, so a
+  // cached markdown copy under the page URL could be handed to a browser.
   const headers = new Headers({
     "Content-Type": "text/markdown; charset=utf-8",
+    "Cache-Control": "private, no-store",
     "Vary": "Accept",
     "Link": formatLinks(page.links),
     "X-Markdown-Tokens": String(estimateTokens(markdown)),
   });
-  for (const name of ["Cache-Control", "Access-Control-Allow-Origin"]) {
-    const value = origin.headers.get(name);
-    if (value !== null) headers.set(name, value);
-  }
+  const allowOrigin = origin.headers.get("Access-Control-Allow-Origin");
+  if (allowOrigin !== null) headers.set("Access-Control-Allow-Origin", allowOrigin);
   return new Response(request.method === "HEAD" ? null : markdown, { status: 200, headers });
 }
 

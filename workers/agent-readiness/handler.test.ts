@@ -135,7 +135,7 @@ test("handle: Accept text/markdown on / serves /index.md as markdown", async () 
   assert.equal(response.headers.get("Vary"), "Accept");
   assert.equal(response.headers.get("X-Markdown-Tokens"), String(estimateTokens(MARKDOWN)));
   assert.equal(response.headers.get("Link"), HOME_LINKS);
-  assert.equal(response.headers.get("Cache-Control"), "max-age=600");
+  assert.equal(response.headers.get("Cache-Control"), "private, no-store");
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
   assert.equal(await response.text(), MARKDOWN);
 });
@@ -377,4 +377,15 @@ test("handle: an origin Vary of * is left as *", async () => {
   const origin = stubOrigin({ "https://burrowsapps.com/": htmlPage(200, { Vary: "*" }) });
   const response = await handle(get("https://burrowsapps.com/"), origin.fetch);
   assert.equal(response.headers.get("Vary"), "*");
+});
+
+test("handle: the markdown response is never storable, whatever the origin says", async () => {
+  for (const path of ["/", "/privacy.html"]) {
+    const file = path === "/" ? "/index.md" : "/privacy.md";
+    const origin = stubOrigin({ [`https://burrowsapps.com${file}`]: markdownFile() });
+    const response = await handle(get(`https://burrowsapps.com${path}`, "text/markdown"), origin.fetch);
+    assert.equal(response.headers.get("Content-Type"), "text/markdown; charset=utf-8");
+    assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+    assert.equal(response.headers.get("Vary"), "Accept");
+  }
 });
