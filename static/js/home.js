@@ -120,8 +120,10 @@
       return { status: 'busy', message: 'Another message is being sent. Wait for it to finish, then try again.' };
     }
     const values = input && typeof input === 'object' ? input : {};
+    // Trimmed here, as send() trims, so whitespace-only input is reported as
+    // missing instead of being sent and rejected by the server.
     for (const name of FIELDS) {
-      form.elements[name].value = typeof values[name] === 'string' ? values[name] : '';
+      form.elements[name].value = typeof values[name] === 'string' ? values[name].trim() : '';
     }
     const valid = validate();
     const errors = {};

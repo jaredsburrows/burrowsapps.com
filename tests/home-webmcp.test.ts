@@ -349,9 +349,29 @@ test("execute works again once the earlier send has finished", async () => {
 
 // B3: whitespace-only values pass validity (valueMissing ignores spaces) and are
 // trimmed to empty by send(), so the server rejects them after the tool said nothing was wrong.
-test("execute with whitespace-only fields reports invalid and sends nothing", { todo: "B3" }, async () => {
+test("execute with whitespace-only fields reports invalid and sends nothing", async () => {
   const { dom, tool } = registeredTool();
   const result = plain(await tool.execute({ name: "   ", email: VALID.email, message: "\n\n" }));
   assert.equal(result.status, "invalid");
   assert.equal(dom.fetchCalls.length, 0);
+  assert.deepEqual(Object.keys(result.errors as Record<string, string>).sort(), ["message", "name"]);
+});
+
+test("execute trims surrounding whitespace before sending", async () => {
+  const { dom, tool } = registeredTool();
+  const result = plain(await tool.execute({ name: ` ${VALID.name} `, email: `${VALID.email}\n`, message: `\n${VALID.message}  ` }));
+  assert.equal(result.status, "sent");
+  assertContactPost(dom);
+});
+
+// The human path's handling of whitespace-only fields predates the tool and is
+// deliberately unchanged: it still posts, and the server rejects it.
+test("a human submit of whitespace-only fields still posts, as it did before the tool", async () => {
+  const dom = createFakeDom();
+  dom.run();
+  dom.fields.name.value = "   ";
+  dom.fields.email.value = VALID.email;
+  dom.fields.message.value = "\n\n";
+  await dom.submitForm();
+  assert.equal(dom.fetchCalls.length, 1);
 });
