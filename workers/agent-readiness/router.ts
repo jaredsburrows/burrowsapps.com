@@ -6,6 +6,7 @@
 // token or a code verifier is never forwarded to GitHub Pages. Everything else
 // keeps the iteration 1 fail-open behavior.
 
+import { handle as api } from "./api.ts";
 import { handle } from "./handler.ts";
 import { json } from "./http.ts";
 import type { Deps, Env } from "./http.ts";
@@ -16,7 +17,15 @@ type Handler = (request: Request, env: Env, deps: Deps, url: URL) => Promise<Res
 
 const notFound = async (): Promise<Response> => json(404, { error: "not_found" });
 
-const ROUTES: Readonly<Record<string, Handler>> = {};
+const publicApi: Handler = (request, env, deps, url) => api(request, env, deps, url, false);
+
+const ROUTES: Readonly<Record<string, Handler>> = {
+  "/api/v1": publicApi,
+  "/api/v1/": publicApi,
+  "/api/v1/company": publicApi,
+  "/api/v1/services": publicApi,
+  "/api/v1/status": publicApi,
+};
 
 export const OWNED_EXACT: readonly string[] = Object.keys(ROUTES);
 export const OWNED_PREFIXES: readonly string[] = ["/api/v1/", "/mcp/", "/oauth/"];

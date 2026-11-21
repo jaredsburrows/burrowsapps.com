@@ -146,3 +146,25 @@ test("11. a throwing log does not change the response", async (t) => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Type") ?? "", /^text\/markdown/);
 });
+
+const OWNED_GETS = ["/api/v1/company"];
+
+for (const path of OWNED_GETS) {
+  test(`3. ${path} is answered without the origin and without passThrough`, async () => {
+    const deps = makeDeps();
+    const response = await route(get(path), makeBaseEnv(), deps);
+    assert.equal(response.status, 200);
+    assert.equal(deps.passThroughCalls, 0);
+    assert.equal(deps.originCalls.length, 0);
+  });
+}
+
+test("4. a throwing handler is a 500 from the Worker, never the origin", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const deps = makeDeps({ now: () => { throw new Error("clock down"); } });
+  const response = await route(get("/api/v1/status"), makeBaseEnv(), deps);
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: "internal_error" });
+  assert.equal(deps.originCalls.length, 0);
+  assert.equal(deps.passThroughCalls, 0);
+});
