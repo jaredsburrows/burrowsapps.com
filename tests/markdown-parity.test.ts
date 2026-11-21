@@ -4,7 +4,16 @@ import { readFile } from "node:fs/promises";
 
 const REPO = new URL("../", import.meta.url);
 
-type Pair = { html: string; markdown: string; mustContain: readonly string[] };
+type Pair = {
+  html: string;
+  markdown: string;
+  mustContain: readonly string[];
+  // Exact markdown lines that have no heading, paragraph, or list item in the
+  // <main> of the HTML page. Every other line must match one, word for word.
+  added: readonly string[];
+  // Exact markdown lines that match an HTML block except for letter case.
+  caseOnly: readonly string[];
+};
 
 // One entry per page that has a hand-written markdown copy.
 const PAIRS: readonly Pair[] = [
@@ -12,8 +21,31 @@ const PAIRS: readonly Pair[] = [
     html: "index.html",
     markdown: "index.md",
     mustContain: ["contact@burrowsapps.com", "https://burrowsapps.com/privacy.html"],
+    added: [
+      // The page title, which the HTML carries in <title> and the logo rather than in <main>.
+      "# Burrows Applications",
+      // The hero ticker, a <div> of <span>s rather than a paragraph.
+      "Specialties: native mobile · cross-platform · web",
+      // Contact details an agent cannot get from the form markup.
+      "- Contact form: https://burrowsapps.com/#contact (name, email, and message are all required)",
+      "- Email: [contact@burrowsapps.com](mailto:contact@burrowsapps.com)",
+      "- LinkedIn: https://linkedin.com/company/burrows-applications",
+      "- X / Twitter: https://x.com/burrowsapps",
+      // The footer link to the privacy policy.
+      "## More",
+      "- [Privacy Policy](https://burrowsapps.com/privacy.html)",
+    ],
+    caseOnly: [],
   },
-  { html: "privacy.html", markdown: "privacy.md", mustContain: [] },
+  {
+    html: "privacy.html",
+    markdown: "privacy.md",
+    mustContain: [],
+    // privacy.md is a legal text: nothing may be added to it.
+    added: [],
+    // The HTML writes the revision line in capitals as a visual style.
+    caseOnly: ["Last revised · July 8, 2026"],
+  },
 ];
 
 const ENTITIES: Readonly<Record<string, string>> = {
@@ -25,7 +57,8 @@ const ENTITIES: Readonly<Record<string, string>> = {
   "&#39;": "'",
 };
 
-const normalize = (text: string): string => text.replace(/\s+/g, " ").trim().toLowerCase();
+const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
+const normalize = (text: string): string => collapse(text).toLowerCase();
 
 const mainOf = (html: string): string => {
   const match = html.match(/<main\b[^>]*>([\s\S]*)<\/main>/i);
@@ -33,22 +66,20 @@ const mainOf = (html: string): string => {
   return match[1];
 };
 
-const htmlBlocks = (main: string): string[] =>
+// Headings, paragraphs, and list items, as plain text with case kept.
+const htmlBlockText = (main: string): string[] =>
   [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
     .map(([, , inner]) =>
-      normalize(inner.replace(/<[^>]+>/g, "").replace(/&(amp|nbsp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity])),
+      collapse(inner.replace(/<[^>]+>/g, "").replace(/&(amp|nbsp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity])),
     )
     .filter((block) => block !== "");
 
-const markdownText = (markdown: string): string =>
-  normalize(
-    markdown
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replaceAll("**", "")
-      .split("\n")
-      .map((line) => line.replace(/^(#{1,6} |- |> )/, ""))
-      .join("\n"),
-  );
+const htmlBlocks = (main: string): string[] => htmlBlockText(main).map(normalize);
+
+const markdownLineText = (line: string): string =>
+  collapse(line.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replaceAll("**", "").replace(/^(#{1,6} |- |> )/, ""));
+
+const markdownText = (markdown: string): string => normalize(markdown.split("\n").map(markdownLineText).join("\n"));
 
 const read = async (path: string): Promise<string> => readFile(new URL(path, REPO), "utf8");
 
@@ -59,6 +90,21 @@ for (const pair of PAIRS) {
     const text = markdownText(await read(pair.markdown));
     for (const block of blocks) {
       assert.ok(text.includes(block), `${pair.markdown} is missing: "${block}"`);
+    }
+  });
+
+  test(`every line of ${pair.markdown} is a heading, paragraph, or list item of ${pair.html}`, async () => {
+    const blocks = new Set(htmlBlockText(mainOf(await read(pair.html))));
+    const lowered = new Set([...blocks].map(normalize));
+    const lines = (await read(pair.markdown)).split("\n").filter((line) => line.trim() !== "");
+    for (const line of lines) {
+      const text = markdownLineText(line);
+      if (blocks.has(text) || pair.added.includes(line)) continue;
+      if (pair.caseOnly.includes(line) && lowered.has(normalize(text))) continue;
+      assert.fail(`${pair.markdown} has a line that is not in the <main> of ${pair.html}: "${line}"`);
+    }
+    for (const allowed of [...pair.added, ...pair.caseOnly]) {
+      assert.ok(lines.includes(allowed), `${pair.markdown} no longer has allow-listed line "${allowed}"`);
     }
   });
 
