@@ -5,6 +5,9 @@
 // Each rule names the Cloudflare Workers documentation page it follows.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { route } from "../../workers/agent-readiness/router.ts";
+import { makeBaseEnv, makeDeps } from "../../workers/agent-readiness/testing.ts";
+import type { TestEnv } from "../../workers/agent-readiness/testing.ts";
 
 const REPO = new URL("../../", import.meta.url);
 
@@ -150,4 +153,76 @@ export function headersFor(pathname: string): Headers {
     for (const [name, value] of rule.headers) headers.append(name, value);
   }
   return headers;
+}
+
+// Assumption, checked under wrangler dev and after the deploy: the type
+// Cloudflare infers from each extension. ".md" and extensionless files get no
+// type here, so they are usable only through a Content-Type rule in _headers.
+const TYPES: Readonly<Record<string, string>> = {
+  ".html": "text/html; charset=utf-8",
+  ".json": "application/json",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+};
+
+// Cloudflare's Cache-Control on every asset that _headers gives none
+// (Static Assets, "Headers").
+const DEFAULT_CACHE = "public, max-age=0, must-revalidate";
+
+const extension = (path: string): string => {
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  const dot = name.lastIndexOf(".");
+  return dot > 0 ? name.slice(dot) : "";
+};
+
+// For a path ending in ".html" whose file is published, the path the asset
+// router redirects it to: "/index.html" to "/", "/privacy.html" to "/privacy"
+// (Static Assets, "HTML handling").
+function htmlRedirect(pathname: string): string | null {
+  if (!pathname.endsWith(".html")) return null;
+  const relative = pathname.slice(1);
+  if (isIgnored(relative) || !isFile(new URL(`./${relative}`, REPO))) return null;
+  return servedPath(relative);
+}
+
+// What env.ASSETS.fetch() is documented to answer. Only the path is used
+// (Static Assets, "Binding"). A path with no file gets 404.html with status
+// 404, because not_found_handling is "404-page".
+export async function assetFetch(request: Request): Promise<Response> {
+  const { pathname } = new URL(request.url);
+  const location = htmlRedirect(pathname);
+  if (location !== null) return new Response(null, { status: 307, headers: { Location: location } });
+  const file = publishedFile(pathname);
+  if (file === null) {
+    const body = request.method === "HEAD" ? null : readFileSync(new URL("404.html", REPO));
+    return new Response(body, { status: 404, headers: { "Content-Type": TYPES[".html"] } });
+  }
+  const headers = headersFor(pathname);
+  const type = TYPES[extension(file.pathname)];
+  if (!headers.has("Content-Type") && type) headers.set("Content-Type", type);
+  if (!headers.has("Cache-Control")) headers.set("Cache-Control", DEFAULT_CACHE);
+  return new Response(request.method === "HEAD" ? null : readFileSync(file), { status: 200, headers });
+}
+
+// The deployed site: the asset router in front of the Worker.
+//   - A path in run_worker_first runs the Worker, which reads files through
+//     env.ASSETS (here, assetFetch).
+//   - Otherwise a GET or HEAD for a file is answered by the asset router.
+//   - Otherwise a browser navigation gets the 404 page without the Worker
+//     (Static Assets, "Routing": Sec-Fetch-Mode navigate).
+//   - Anything else runs the Worker, as a request that matches no file does.
+export async function site(request: Request, env: TestEnv = makeBaseEnv()): Promise<Response> {
+  const { pathname } = new URL(request.url);
+  const deps = makeDeps();
+  deps.setOrigin(assetFetch);
+  if (runsWorkerFirst(pathname)) return route(request, env, deps);
+  const isRead = request.method === "GET" || request.method === "HEAD";
+  if (isRead && (publishedFile(pathname) !== null || htmlRedirect(pathname) !== null)) return assetFetch(request);
+  if (request.headers.get("Sec-Fetch-Mode") === "navigate") return assetFetch(request);
+  return route(request, env, deps);
 }

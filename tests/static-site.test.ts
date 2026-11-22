@@ -12,9 +12,13 @@ import {
   publishedPaths,
   ruleMatches,
   servedPath,
+  site,
 } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
+const SITE = "https://burrowsapps.com";
+const get = (path: string, init?: RequestInit): Promise<Response> => site(new Request(`${SITE}${path}`, init));
+const NOT_FOUND_PAGE = readFileSync(new URL("404.html", REPO), "utf8");
 
 test("every top-level entry is published, consumed by wrangler, or in .assetsignore", async () => {
   const unclassified = readdirSync(REPO).filter(
@@ -92,5 +96,36 @@ test("the two pages get no cache lifetime, Link, or Vary from _headers", async (
     for (const name of ["Cache-Control", "CDN-Cache-Control", "Expires", "Link", "Vary"]) {
       assert.equal(headers.get(name), null, `${path} gets ${name}`);
     }
+  }
+});
+
+test("the markdown files are served as text/markdown with UTF-8 and CORS", async () => {
+  for (const path of ["/index.md", "/privacy.md", "/auth.md", "/developers.md", "/.well-known/agent-skills/contact-burrows-applications/SKILL.md"]) {
+    const response = await get(path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("Content-Type"), "text/markdown; charset=utf-8", path);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*", path);
+  }
+});
+
+test("the discovery JSON files are served as application/json with CORS", async () => {
+  for (const path of ["/.well-known/ai-catalog.json", "/.well-known/ard.json"]) {
+    const response = await get(path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("Content-Type"), "application/json", path);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*", path);
+  }
+});
+
+test("styles get an hour of cache and images a month", async () => {
+  assert.equal((await get("/static/css/home.css")).headers.get("Cache-Control"), "public, max-age=3600");
+  assert.equal((await get("/static/img/og.jpg")).headers.get("Cache-Control"), "public, max-age=2592000");
+});
+
+test("repository files that are not part of the site answer with the 404 page", async () => {
+  for (const path of ["/README.md", "/tests/robots.test.ts", "/workers/contact/index.js", "/wrangler.jsonc", "/.team/STATUS.md", "/CNAME"]) {
+    const response = await get(path);
+    assert.equal(response.status, 404, path);
+    assert.equal(await response.text(), NOT_FOUND_PAGE, path);
   }
 });
