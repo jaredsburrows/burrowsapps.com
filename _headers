@@ -1,6 +1,7 @@
-# Read by Cloudflare at deploy time and not served. It applies to static files
-# only: responses built by the Worker (/, /privacy.html, /mcp, /api/v1) set
-# their own headers in code.
+# Read by Cloudflare at deploy time and not served. It applies to static
+# files, including the two pages the Worker reads through its ASSETS binding
+# (/ and /privacy.html get the /* rule). Responses the Worker builds itself
+# (/mcp, /api/v1, the markdown variants) set their own headers in code.
 #
 # When several rules match one URL, their values for the same header are joined
 # with a comma. So a header set under /* must not be set again further down,
@@ -25,7 +26,8 @@
 /favicon.ico
   Cache-Control: public, max-age=2592000
 
-# Markdown, with the charset stated: the files contain non-ASCII punctuation.
+# Markdown. Cloudflare infers the same type; stated here so it cannot change,
+# because the files contain non-ASCII punctuation.
 /index.md
   Content-Type: text/markdown; charset=utf-8
 
