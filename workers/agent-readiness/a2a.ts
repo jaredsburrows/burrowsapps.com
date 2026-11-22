@@ -189,11 +189,15 @@ const PART_KINDS = ["text", "raw", "url", "data"] as const;
 const MAX_PARTS = 16;
 const CONTEXT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
-// Checked in order; the first match wins.
+// Checked in order; the first match wins. The text has its whitespace
+// collapsed to single spaces and curly apostrophes made straight. Contact
+// words are phrases ("reach you", "get in touch") so that "reach more users"
+// or "are you hiring?" (a question about jobs) is not taken as a request to
+// get in touch.
 const KEYWORDS: readonly (readonly [string, RegExp])[] = [
-  ["contact-options", /\b(contact|email|e-mail|reach|touch|hire|hiring|inquiry|inquire|quote)\b/],
-  ["services", /\b(services?|builds?|building|offers?|platforms?|android|ios|kotlin|multiplatform|kmp|websites?|apps?)\b/],
-  ["company-profile", /\b(who|about|company|profile|founder|founded|what is)\b/],
+  ["contact-options", /\b(contact|email|e-mail|get in touch|in touch with|reach (you|out|burrows)|hire|inquiry|inquire|quote)\b/],
+  ["services", /\b(services?|builds?|building|offers?|platforms?|android|ios|kotlin|multiplatform|kmp|websites?|apps?|makes?|making|develops?|developing)\b/],
+  ["company-profile", /\b(who|about|company|profile|founder|founded|what is|what's|whats|what do you do|what does it do)\b/],
 ];
 
 const knownSkill = (value: unknown): value is string => typeof value === "string" && Object.hasOwn(ANSWERS, value);
@@ -256,7 +260,7 @@ function sendMessage(id: Id, params: Record<string, unknown>): Response {
   if (accepted !== undefined && !Array.isArray(accepted)) return rpcError(id, -32602, "Invalid params");
   const modes = Array.isArray(accepted) && accepted.length > 0 ? accepted.map(mediaType) : [...MODES];
 
-  const text = parts.map((part) => part.text).join(" ").toLowerCase().trim();
+  const text = parts.map((part) => part.text).join(" ").toLowerCase().replace(/\s+/g, " ").replaceAll("\u2019", "'").trim();
   const skillId = chooseSkill(message, params, text);
   const answer = skillId === "help" ? helpAnswer() : ANSWERS[skillId]();
   const contextId = typeof message.contextId === "string" ? message.contextId : crypto.randomUUID();

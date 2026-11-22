@@ -203,6 +203,23 @@ for (const skill of SKILLS) {
   }
 }
 
+for (const [text, skillId] of [
+  ["What's Burrows Applications?", "company-profile"],
+  ["What\u2019s Burrows Applications?", "company-profile"],
+  ["What do you do?", "company-profile"],
+  ["what  do\tyou do", "company-profile"],
+  ["What do you make?", "services"],
+  ["Are you hiring?", "help"],
+  ["I want to reach more users with my app", "services"],
+  ["Can I reach you about a project?", "contact-options"],
+  ["How do I get in touch?", "contact-options"],
+] as const) {
+  test(`SendMessage: "${text}" routes to ${skillId}`, async () => {
+    const message = await expectMessage(await send(say(text)));
+    assert.deepEqual(message.metadata, { skillId });
+  });
+}
+
 test("SendMessage: message metadata wins over request metadata", async () => {
   const message = await expectMessage(await send(say("hello", { metadata: { skillId: "services" } }, { metadata: { skillId: "contact-options" } })));
   expectSkill(message, "services");
