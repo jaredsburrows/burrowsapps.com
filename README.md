@@ -94,7 +94,7 @@ Until GitHub Pages is switched off, an uncaught error in the Worker falls back t
 
 #### Deploy
 
-CI deploys: `.github/workflows/build.yml` runs the checks, and on a push to `gh-pages` the "Deploy to Cloudflare" job runs `wrangler deploy` in the GitHub Environment `production`. That environment is restricted to the `gh-pages` branch and holds the secret `CLOUDFLARE_API_TOKEN`; it is not a repository secret, so a workflow edited on another branch cannot read it. The token is a Cloudflare user API token with exactly one permission, Account > Workers Scripts > Edit. Cloudflare cannot scope it to one Worker: it can replace or delete every Worker in the account, the contact Worker included. Give it an expiry (a year at most) and rotate it before then; never widen it. Pull requests run only the checks, ending with a credential-free `wrangler deploy --dry-run`.
+CI deploys: `.github/workflows/build.yml` runs the checks, and on a push to `gh-pages` the "Deploy to Cloudflare" job runs `wrangler deploy` with the repository secret `CLOUDFLARE_API_TOKEN`. The token is a Cloudflare user API token with exactly one permission, Account > Workers Scripts > Edit. Cloudflare cannot scope it to one Worker: it can replace or delete every Worker in the account, the contact Worker included. Give it an expiry (a year at most) and rotate it before then; never widen it. Pull requests run only the checks, ending with a credential-free `wrangler deploy --dry-run`.
 
 To deploy again without a new commit, run the workflow from the Actions tab on `gh-pages`.
 
