@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
 import { CARD, MODERN_VERSION, SERVER, SUPPORTED_VERSIONS, TOOLS } from "./mcp.ts";
+import { site } from "../../tests/support/static-site.ts";
 import { route } from "./router.ts";
 import { makeBaseEnv, makeDeps } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
@@ -341,7 +342,7 @@ test("legacy: tools/call with no prior initialize is served", async () => {
   assert.deepEqual(call.structuredContent, contactOptions());
 });
 
-// Card
+// Card: a static file at both paths, fetched from the emulated site.
 
 const CARD_PATHS: Record<string, string> = {
   "/mcp/server-card": "application/mcp-server-card+json",
@@ -349,7 +350,7 @@ const CARD_PATHS: Record<string, string> = {
 };
 
 const fetchCard = (path: string, init: RequestInit = {}): Promise<Response> =>
-  route(new Request(`https://burrowsapps.com${path}`, init), makeBaseEnv(), makeDeps());
+  site(new Request(`https://burrowsapps.com${path}`, init));
 
 test("card: both paths return the same bytes", async () => {
   const [a, b] = await Promise.all(Object.keys(CARD_PATHS).map(async (path) => (await fetchCard(path)).text()));
@@ -367,7 +368,6 @@ for (const [path, type] of Object.entries(CARD_PATHS)) {
     assert.equal(response.headers.get("Access-Control-Allow-Headers"), "Content-Type, If-None-Match");
     assert.equal(response.headers.get("Access-Control-Expose-Headers"), "ETag");
     assert.equal(response.headers.get("Cache-Control"), "public, max-age=3600");
-    assert.equal((await fetchCard(path, { method: "POST" })).status, 405);
   });
 }
 

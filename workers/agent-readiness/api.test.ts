@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
+import { site } from "../../tests/support/static-site.ts";
 import { API_VERSION, CATALOG, openapi } from "./api.ts";
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
 import { isOwned, route } from "./router.ts";
@@ -8,6 +9,9 @@ import { makeBaseEnv, makeDeps, T0 } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
 
 const SITE = "https://burrowsapps.com";
+
+// The catalog is a static file: fetched from the emulated site.
+const fetchSite = (path: string, init: RequestInit = {}): Promise<Response> => site(new Request(`${SITE}${path}`, init));
 
 const call = async (path: string, init: RequestInit = {}, env: TestEnv = makeBaseEnv()) => {
   const deps = makeDeps();
@@ -96,7 +100,7 @@ const targets = (entry: CatalogEntry): string[] => [
 ];
 
 test("4. the catalog is a linkset served as plain application/linkset+json", async () => {
-  const { response, deps } = await call("/.well-known/api-catalog", { headers: { Accept: "application/linkset+json, application/json" } });
+  const response = await fetchSite("/.well-known/api-catalog", { headers: { Accept: "application/linkset+json, application/json" } });
   assert.equal(response.status, 200);
   const type = response.headers.get("Content-Type") ?? "";
   assert.equal(type, "application/linkset+json");
@@ -106,8 +110,7 @@ test("4. the catalog is a linkset served as plain application/linkset+json", asy
   for (const entry of body.linkset.slice(1)) {
     for (const key of ["anchor", "service-desc", "service-doc"]) assert.ok(key in entry, `entry lacks ${key}`);
   }
-  assert.equal(deps.originCalls.length, 0);
-  const head = (await call("/.well-known/api-catalog", { method: "HEAD" })).response;
+  const head = await fetchSite("/.well-known/api-catalog", { method: "HEAD" });
   assert.equal(head.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');
 });
 
@@ -120,10 +123,9 @@ test("4. the catalog's own entry lists every API anchor as an item with a title"
   for (const href of targets(self)) assert.notEqual(resolveSiteUrl(href), null, `${href} does not resolve`);
 });
 
-// Pages serves .md files as text/markdown; everything else typed here is the Worker's.
+// Every link target, file or Worker path, as the deployed site serves it.
 const servedType = async (href: string): Promise<string> => {
-  if (resolveSiteUrl(href) === "file" && !isOwned(new URL(href).pathname)) return href.endsWith(".md") ? "text/markdown" : "unknown";
-  const { response } = await call(new URL(href).pathname);
+  const response = await site(new Request(href));
   assert.equal(response.status, 200, href);
   return (response.headers.get("Content-Type") ?? "").split(";")[0].trim();
 };
