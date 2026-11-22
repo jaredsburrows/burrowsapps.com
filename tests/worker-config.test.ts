@@ -5,14 +5,14 @@ import { readFile } from "node:fs/promises";
 import { PAGES } from "../workers/agent-readiness/handler.ts";
 import { OWNED_EXACT } from "../workers/agent-readiness/router.ts";
 import { resolveSiteUrl } from "./support/site-map.ts";
-import { publishedFile, publishedPaths, runsWorkerFirst, servedPath } from "./support/static-site.ts";
+import { globMatches, publishedFile, publishedPaths, runsWorkerFirst, servedPath, workerFirstPatterns } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
 const SITE_CONFIG = new URL("wrangler.jsonc", REPO);
 const CONTACT_CONFIG = new URL("workers/contact/wrangler.jsonc", REPO);
 const HTTP_SOURCE = new URL("workers/agent-readiness/http.ts", REPO);
 const ALLOWED_RELS = ["alternate", "api-catalog", "service-desc", "service-doc", "describedby", "privacy-policy"];
-const RUN_WORKER_FIRST = ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/", "/api/v1/*"];
+const RUN_WORKER_FIRST = ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/*"];
 
 // The route that attaches the site Worker to the zone. It is kept in the
 // Cloudflare dashboard, not in wrangler.jsonc, so no deploy can change it.
@@ -73,6 +73,24 @@ test("the assets settings are exactly the ones the Worker and the tests depend o
     not_found_handling: "404-page",
     run_worker_first: RUN_WORKER_FIRST,
   });
+});
+
+// Wrangler refuses a run_worker_first list in which a glob entry makes another
+// entry redundant ("rule '/api/v1/*' makes it redundant").
+test("no run_worker_first entry is covered by another entry in the list", async () => {
+  const patterns = workerFirstPatterns();
+  assert.equal(new Set(patterns).size, patterns.length, "duplicate entries");
+  for (const glob of patterns.filter((pattern) => pattern.includes("*"))) {
+    for (const entry of patterns.filter((pattern) => pattern !== glob)) {
+      assert.ok(!globMatches(glob, entry), `${glob} makes ${entry} redundant`);
+    }
+  }
+});
+
+test("/api/v1/ still runs the Worker through the /api/v1/* entry", async () => {
+  assert.ok(runsWorkerFirst("/api/v1/"));
+  assert.ok(runsWorkerFirst("/api/v1/status"));
+  assert.ok(!runsWorkerFirst("/api/v1x"));
 });
 
 test("every page the Worker decorates and every path it owns runs the Worker first", async () => {

@@ -79,7 +79,7 @@ node --test "tests/*.test.ts" "workers/agent-readiness/*.test.ts"
 
 - `/` and `/privacy.html`: the Worker adds `Link` headers and answers `Accept: text/markdown` with the markdown file (`Cache-Control: private, no-store`, `Vary: Accept`); browsers still get HTML. The query string is not part of the match, so `/?utm_source=x` runs the Worker too. The Worker reads the pages through the `ASSETS` binding: `/` and `/privacy`, where the asset router serves `index.html` and `privacy.html`.
 - `/mcp`: the MCP server.
-- `/api/v1`, `/api/v1/`, `/api/v1/*`: the JSON API, rate limited by `PUBLIC_LIMITER`, with a clock in `/status`.
+- `/api/v1` and `/api/v1/*` (which covers `/api/v1/`): the JSON API, rate limited by `PUBLIC_LIMITER`, with a clock in `/status`.
 
 The paths the Worker answers itself never fall through to a file; an internal error there is a JSON `500`. If decorating a page fails, the visitor gets the plain file.
 

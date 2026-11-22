@@ -50,7 +50,7 @@
     //   /api/v1 ...        the JSON API: rate limited, and /status needs a clock
     // Every request that matches a pattern here is a Worker request. Do not
     // add a pattern that matches a static file.
-    "run_worker_first": ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/", "/api/v1/*"]
+    "run_worker_first": ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/*"]
   },
   // Per Cloudflare location and approximate, like the contact Worker's limits.
   //   PUBLIC_LIMITER   60/min per IP: /api/v1 and POST /mcp

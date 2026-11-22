@@ -109,14 +109,22 @@ const siteConfig = (): SiteConfig =>
       .join("\n"),
   );
 
-// True when a path matches assets.run_worker_first: exactly, or as a prefix
-// when the pattern ends in "*" (Static Assets, "run_worker_first").
-// Assumption, checked under wrangler dev before the merge: a pattern is
-// matched against the path alone, so "/?sent=1" matches "/".
+// The patterns in assets.run_worker_first, as written in wrangler.jsonc.
+export function workerFirstPatterns(): string[] {
+  return siteConfig().assets.run_worker_first;
+}
+
+// A run_worker_first pattern: "*" matches any run of characters, including
+// "/" and none at all (Static Assets, "run_worker_first"). Measured under
+// wrangler dev: "/api/v1/*" answers "/api/v1/", and the match uses the path
+// alone, so "/?x=1" matches "/".
+export function globMatches(pattern: string, pathname: string): boolean {
+  const source = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+  return new RegExp(`^${source}$`).test(pathname);
+}
+
 export function runsWorkerFirst(pathname: string): boolean {
-  return siteConfig().assets.run_worker_first.some((pattern) =>
-    pattern.endsWith("*") ? pathname.startsWith(pattern.slice(0, -1)) : pathname === pattern,
-  );
+  return workerFirstPatterns().some((pattern) => globMatches(pattern, pathname));
 }
 
 export type HeaderRule = { pattern: string; headers: [string, string][] };
