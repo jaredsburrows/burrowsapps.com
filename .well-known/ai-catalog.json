@@ -39,6 +39,17 @@
         "get the Burrows Applications company profile as JSON",
         "which platforms does Burrows Applications develop for"
       ]
+    },
+    {
+      "identifier": "urn:air:burrowsapps.com:a2a:site",
+      "displayName": "Burrows Applications A2A agent",
+      "description": "Read-only A2A agent (JSON-RPC, protocol 1.0) that answers with facts about Burrows Applications: company profile, services, and how to get in touch.",
+      "type": "application/a2a-agent-card+json",
+      "url": "https://burrowsapps.com/.well-known/agent-card.json",
+      "representativeQueries": [
+        "ask the Burrows Applications agent what it builds",
+        "agent-to-agent contact details for Burrows Applications"
+      ]
     }
   ]
 }

@@ -26,13 +26,21 @@ Server card: https://burrowsapps.com/mcp/server-card
 
 Tools, all read-only and without arguments: `get_company_profile`, `list_services`, `get_contact_options`.
 
+## A2A agent (no authentication)
+
+Endpoint: `https://burrowsapps.com/a2a`. A2A protocol `1.0`, JSON-RPC binding, `POST` only, stateless. Send the `A2A-Version: 1.0` header.
+
+Agent Card: https://burrowsapps.com/.well-known/agent-card.json
+
+Skills: `company-profile`, `services`, `contact-options`. `SendMessage` answers with a message, never a task; pick a skill with `metadata.skillId` or ask in plain words. No streaming, no push notifications.
+
 ## No login
 
 Nothing here needs a credential, and none is offered. The contact form's endpoint, `/api/contact`, is meant only for the form on burrowsapps.com and is protected by bot checks and rate limits. To send a message, use the form or email.
 
 ## Limits
 
-Public API and MCP: 60 requests a minute for each IP address. A `429` response carries `Retry-After`.
+Public API, MCP, and A2A: 60 requests a minute for each IP address. A `429` response carries `Retry-After`.
 
 ## Other ways to get in touch
 

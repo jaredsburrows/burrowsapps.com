@@ -6,7 +6,7 @@ Agent authentication and registration discovery for `burrowsapps.com`.
 
 **No authentication is required, offered, or possible.** Burrows Applications has no login. Every URL this site publishes can be fetched anonymously, and nothing here issues a credential.
 
-The site does run endpoints, and none of them takes a credential. Two are built for agents and serve read-only facts about the company anonymously: the JSON API under `/api/v1` and an MCP server at `/mcp`. The third, `/api/contact`, is the backend of the site's contact form and is meant only for that form. Each is described below so that an agent learns this here rather than discovering it as a `404`.
+The site does run endpoints, and none of them takes a credential. Three are built for agents and serve read-only facts about the company anonymously: the JSON API under `/api/v1`, an MCP server at `/mcp`, and an A2A agent at `/a2a`. The fourth, `/api/contact`, is the backend of the site's contact form and is meant only for that form. Each is described below so that an agent learns this here rather than discovering it as a `404`.
 
 ## Sent here to sign in?
 
@@ -34,7 +34,9 @@ Agents should not call it. If a person is present, send them to [the contact for
 
 `/mcp` is a Model Context Protocol server over Streamable HTTP, with three read-only tools that return the same facts. It is anonymous in the same way. Its server card is at [`/mcp/server-card`](/mcp/server-card) and [`/.well-known/mcp/server-card.json`](/.well-known/mcp/server-card.json).
 
-Both are rate limited for each IP address. Neither can send a message.
+`/a2a` is an A2A agent (protocol 1.0, JSON-RPC) with three read-only skills that return the same facts. It is anonymous in the same way. Its Agent Card is at [`/.well-known/agent-card.json`](/.well-known/agent-card.json).
+
+All three are rate limited for each IP address. None can send a message.
 
 ## The OAuth documents say no
 

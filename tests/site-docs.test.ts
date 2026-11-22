@@ -25,7 +25,7 @@ const siteUrls = (text: string): string[] =>
 // Endpoint paths named inside code spans, such as `GET /api/v1/company`.
 const endpointPaths = (text: string): string[] => {
   const spans = [...text.matchAll(/`([^`]+)`/g)].map(([, span]) => span);
-  const paths = spans.flatMap((span) => span.match(/(?:^|\s)(\/(?:api\/v1|mcp)[^\s?]*)/g) ?? []).map((path) => path.trim());
+  const paths = spans.flatMap((span) => span.match(/(?:^|\s)(\/(?:api\/v1|mcp|a2a)[^\s?]*)/g) ?? []).map((path) => path.trim());
   return [...new Set(paths)];
 };
 
@@ -93,7 +93,7 @@ test("every link in auth.md resolves to a file or a Worker path", async () => {
 
 test("auth.md names only paths that the Worker owns or that are published files, plus the contact form's", async () => {
   for (const path of endpointPaths(authMd)) assert.ok(servedPath(path), `${path} is neither owned by the Worker nor a published file`);
-  for (const path of ["/api/v1", "/mcp", "/api/contact"]) assert.ok(authMd.includes(`\`${path}\``), `auth.md does not name ${path}`);
+  for (const path of ["/api/v1", "/mcp", "/a2a", "/api/contact"]) assert.ok(authMd.includes(`\`${path}\``), `auth.md does not name ${path}`);
 });
 
 test("auth.md's statements about the contact endpoint are in the contact Worker", async () => {
