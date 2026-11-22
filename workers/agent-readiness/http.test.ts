@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allow, clientIp, json, methodNotAllowed, preflight, readBody, staticDoc, tooMany } from "./http.ts";
+import { allow, clientIp, isObject, json, methodNotAllowed, preflight, readBody, staticDoc, tooMany, validOrigin } from "./http.ts";
 import { fakeLimiter } from "./testing.ts";
 
 const post = (body: BodyInit | null, headers: Record<string, string> = {}): Request =>
@@ -148,4 +148,19 @@ test("preflight, methodNotAllowed, and tooMany have their documented shapes", as
 test("clientIp reads CF-Connecting-IP or says unknown", async () => {
   assert.equal(clientIp(new Request("https://burrowsapps.com/", { headers: { "CF-Connecting-IP": "203.0.113.9" } })), "203.0.113.9");
   assert.equal(clientIp(new Request("https://burrowsapps.com/")), "unknown");
+});
+
+test("isObject accepts plain objects and refuses arrays, null, and primitives", () => {
+  assert.equal(isObject({}), true);
+  assert.equal(isObject({ a: 1 }), true);
+  for (const value of [null, undefined, [], [1], "x", 1, true]) assert.equal(isObject(value), false, String(value));
+});
+
+test("validOrigin accepts no Origin and http or https origins, and refuses the rest", () => {
+  assert.equal(validOrigin(null), true);
+  assert.equal(validOrigin("https://example.com"), true);
+  assert.equal(validOrigin("http://localhost:8787"), true);
+  for (const origin of ["null", "", "file:///etc", "javascript:alert(1)", "not a url"]) {
+    assert.equal(validOrigin(origin), false, origin);
+  }
 });

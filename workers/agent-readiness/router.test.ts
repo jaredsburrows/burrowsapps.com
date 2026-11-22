@@ -172,6 +172,7 @@ test("4. a throwing handler is a 500 from the Worker, never the origin", async (
 
 test("12. the owned exact paths are exactly the documented ones", async () => {
   assert.deepEqual([...OWNED_EXACT].sort(), [
+    "/a2a",
     "/api/v1",
     "/api/v1/",
     "/api/v1/company",
@@ -185,6 +186,13 @@ test("12. the owned exact paths are exactly the documented ones", async () => {
 test("3. the MCP endpoint never reaches the static files", async () => {
   const deps = makeDeps();
   await route(new Request(`${SITE}/mcp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }), makeBaseEnv(), deps);
+  assert.equal(deps.passThroughCalls, 0);
+  assert.equal(deps.originCalls.length, 0);
+});
+
+test("the A2A endpoint never reaches the static files", async () => {
+  const deps = makeDeps();
+  await route(new Request(`${SITE}/a2a`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }), makeBaseEnv(), deps);
   assert.equal(deps.passThroughCalls, 0);
   assert.equal(deps.originCalls.length, 0);
 });

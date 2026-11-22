@@ -1,7 +1,7 @@
 # Read by Cloudflare at deploy time and not served. It applies to static
 # files, including the two pages the Worker reads through its ASSETS binding
 # (/ and /privacy.html get the /* rule). Responses the Worker builds itself
-# (/mcp, /api/v1, the markdown variants) set their own headers in code.
+# (/mcp, /a2a, /api/v1, the markdown variants) set their own headers in code.
 #
 # When several rules match one URL, their values for the same header are joined
 # with a comma. So a header set under /* must not be set again further down,
@@ -67,6 +67,12 @@
   Access-Control-Expose-Headers: ETag
 
 /.well-known/mcp/server-card.json
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Methods: GET
+  Access-Control-Allow-Headers: Content-Type, If-None-Match
+  Access-Control-Expose-Headers: ETag
+
+/.well-known/agent-card.json
   Cache-Control: public, max-age=3600
   Access-Control-Allow-Methods: GET
   Access-Control-Allow-Headers: Content-Type, If-None-Match

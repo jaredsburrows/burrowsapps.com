@@ -107,6 +107,7 @@ export const CATALOG: Record<string, unknown> = {
       item: [
         { href: BASE, title: "Burrows Applications public API" },
         { href: "https://burrowsapps.com/mcp", title: "Burrows Applications MCP server" },
+        { href: "https://burrowsapps.com/a2a", title: "Burrows Applications A2A agent" },
       ],
     },
     {
@@ -118,6 +119,11 @@ export const CATALOG: Record<string, unknown> = {
     {
       anchor: "https://burrowsapps.com/mcp",
       "service-desc": [{ href: "https://burrowsapps.com/mcp/server-card", type: "application/mcp-server-card+json" }],
+      "service-doc": [{ href: DOCS, type: "text/markdown" }],
+    },
+    {
+      anchor: "https://burrowsapps.com/a2a",
+      "service-desc": [{ href: "https://burrowsapps.com/.well-known/agent-card.json", type: JSON_TYPE }],
       "service-doc": [{ href: DOCS, type: "text/markdown" }],
     },
   ],

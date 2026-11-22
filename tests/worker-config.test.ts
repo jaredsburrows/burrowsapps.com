@@ -12,7 +12,7 @@ const SITE_CONFIG = new URL("wrangler.jsonc", REPO);
 const CONTACT_CONFIG = new URL("workers/contact/wrangler.jsonc", REPO);
 const HTTP_SOURCE = new URL("workers/agent-readiness/http.ts", REPO);
 const ALLOWED_RELS = ["alternate", "api-catalog", "service-desc", "service-doc", "describedby", "privacy-policy"];
-const RUN_WORKER_FIRST = ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/*"];
+const RUN_WORKER_FIRST = ["/", "/privacy.html", "/mcp", "/a2a", "/api/v1", "/api/v1/*"];
 
 // The route that attaches the site Worker to the zone. It is kept in the
 // Cloudflare dashboard, not in wrangler.jsonc, so no deploy can change it.

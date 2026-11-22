@@ -71,3 +71,10 @@ test("the MCP server card entry points at the published server card file", async
   assert.equal(entry.url, "https://burrowsapps.com/mcp/server-card");
   assert.equal(resolveSiteUrl(entry.url), "file");
 });
+
+test("the A2A entry points at the published Agent Card file", async () => {
+  const entry = (await readManifest()).entries.find((candidate) => candidate.type === "application/a2a-agent-card+json");
+  assert.ok(entry?.url, "no application/a2a-agent-card+json entry");
+  assert.equal(entry.url, "https://burrowsapps.com/.well-known/agent-card.json");
+  assert.equal(resolveSiteUrl(entry.url), "file");
+});

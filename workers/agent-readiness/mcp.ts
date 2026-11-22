@@ -4,7 +4,7 @@
 // responses only: no sessions, no SSE stream, nothing kept between requests.
 
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
-import { allow, clientIp, json, preflight, readBody } from "./http.ts";
+import { allow, clientIp, isObject, json, preflight, readBody, validOrigin } from "./http.ts";
 import type { Env } from "./http.ts";
 
 export const SERVER = { name: "com.burrowsapps/site", title: "Burrows Applications", version: "1.0.0" } as const;
@@ -122,19 +122,6 @@ function rpcError(
 
 function accepted(): Response {
   return new Response(null, { status: 202, headers: { "Access-Control-Allow-Origin": "*", ...NO_STORE } });
-}
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-function validOrigin(origin: string | null): boolean {
-  if (origin === null) return true;
-  try {
-    const { protocol } = new URL(origin);
-    return protocol === "https:" || protocol === "http:";
-  } catch {
-    return false;
-  }
 }
 
 // Mcp-Name may be sent as "=?base64?<b64>?=" for names that are not plain ASCII.

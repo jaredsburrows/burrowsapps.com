@@ -3,6 +3,7 @@
 // tests/static-documents.test.ts fails when a committed file differs.
 // Nothing the Worker runs imports this module.
 
+import { AGENT_CARD, AGENT_CARD_PATH } from "./a2a.ts";
 import { CATALOG } from "./api.ts";
 import { CARD, CARD_PATH, CARD_WELL_KNOWN_PATH } from "./mcp.ts";
 import { AUTHORIZATION_SERVER, PROTECTED_RESOURCE } from "./wellknown.ts";
@@ -15,4 +16,5 @@ export const DOCUMENTS: Readonly<Record<string, string>> = {
   "/.well-known/oauth-protected-resource": `${JSON.stringify(PROTECTED_RESOURCE, null, 2)}\n`,
   [CARD_PATH]: `${JSON.stringify(CARD)}\n`,
   [CARD_WELL_KNOWN_PATH]: `${JSON.stringify(CARD)}\n`,
+  [AGENT_CARD_PATH]: `${JSON.stringify(AGENT_CARD)}\n`,
 };

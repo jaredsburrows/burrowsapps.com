@@ -106,7 +106,7 @@ test("4. the catalog is a linkset served as plain application/linkset+json", asy
   assert.equal(type, "application/linkset+json");
   assert.equal(response.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');
   const body = await response.json();
-  assert.ok(Array.isArray(body.linkset) && body.linkset.length === 3);
+  assert.ok(Array.isArray(body.linkset) && body.linkset.length === 4);
   for (const entry of body.linkset.slice(1)) {
     for (const key of ["anchor", "service-desc", "service-doc"]) assert.ok(key in entry, `entry lacks ${key}`);
   }

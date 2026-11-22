@@ -9,6 +9,7 @@
 // a 500 from here, and passThroughOnException is not armed for them. For
 // everything else, failing open means serving the plain file.
 
+import { endpoint as a2a } from "./a2a.ts";
 import { handle as api } from "./api.ts";
 import { assetRequest, handle } from "./handler.ts";
 import { CARD_PATH, endpoint as mcp } from "./mcp.ts";
@@ -31,6 +32,7 @@ const ROUTES: Readonly<Record<string, Handler>> = {
   "/api/v1/status": publicApi,
   "/api/v1/openapi.json": publicApi,
   "/mcp": (request, env) => mcp(request, env),
+  "/a2a": (request, env) => a2a(request, env),
 };
 
 export const OWNED_EXACT: readonly string[] = Object.keys(ROUTES);

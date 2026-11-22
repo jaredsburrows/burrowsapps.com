@@ -22,6 +22,21 @@ export type Deps = {
 export const ORIGIN = "https://burrowsapps.com";
 export const CORS: Readonly<Record<string, string>> = { "Access-Control-Allow-Origin": "*" };
 
+export const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// True for a missing Origin or one with an http or https scheme. Endpoints
+// that any web origin may call use it to refuse only malformed origins.
+export function validOrigin(origin: string | null): boolean {
+  if (origin === null) return true;
+  try {
+    const { protocol } = new URL(origin);
+    return protocol === "https:" || protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export function json(status: number, body: unknown, headers?: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,

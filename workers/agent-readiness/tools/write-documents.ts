@@ -1,5 +1,6 @@
 // Writes the generated static documents into the repository. Run it after
-// changing CATALOG, CARD, or the OAuth documents, and commit the result:
+// changing CATALOG, CARD, AGENT_CARD, or the OAuth documents, and commit the
+// result:
 //   node workers/agent-readiness/tools/write-documents.ts
 
 import { mkdir, writeFile } from "node:fs/promises";
