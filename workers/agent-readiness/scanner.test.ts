@@ -10,7 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
-import { site } from "../../tests/support/static-site.ts";
+import { runsWorkerFirst, site } from "../../tests/support/static-site.ts";
 
 const SITE = "https://burrowsapps.com";
 const REPO = new URL("../../", import.meta.url);
@@ -104,4 +104,40 @@ test("mcpServerCard: the well-known card has serverInfo, a transport endpoint, a
   assert.equal(typeof card.transport.endpoint, "string");
   assert.equal(typeof card.capabilities, "object");
   assert.equal(resolveSiteUrl(card.transport.endpoint), "worker");
+});
+
+test("a2aAgentCard: the card has the documented fields, and its interface is a live agent", async () => {
+  const response = await scan(`${SITE}/.well-known/agent-card.json`);
+  assert.equal(response.headers.get("Content-Type"), "application/json");
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+  const card = await jsonOf(response);
+  for (const key of ["name", "version", "description"]) assert.equal(typeof card[key], "string", key);
+  assert.ok(nonEmptyArray(card.supportedInterfaces));
+  for (const entry of card.supportedInterfaces) {
+    assert.equal(typeof entry.url, "string");
+    assert.equal(typeof entry.protocolBinding, "string");
+  }
+  assert.equal(typeof card.capabilities, "object");
+  assert.ok(card.capabilities !== null && !Array.isArray(card.capabilities));
+  assert.ok(nonEmptyArray(card.skills));
+  for (const skill of card.skills) {
+    for (const key of ["id", "name", "description"]) assert.equal(typeof skill[key], "string", key);
+  }
+
+  const [{ url, protocolVersion }] = card.supportedInterfaces;
+  assert.equal(resolveSiteUrl(url), "worker");
+  assert.ok(runsWorkerFirst(new URL(url).pathname), "the agent runs before the asset router");
+  const reply = await site(new Request(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "A2A-Version": protocolVersion },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "SendMessage",
+      params: { message: { messageId: "scan-1", role: "ROLE_USER", parts: [{ text: card.skills[0].examples[0] }] } },
+    }),
+  }));
+  const body = await jsonOf(reply);
+  assert.equal(body.result?.message?.role, "ROLE_AGENT", JSON.stringify(body));
+  assert.deepEqual(body.result.message.metadata, { skillId: card.skills[0].id });
 });
