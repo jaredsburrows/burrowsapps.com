@@ -4,10 +4,9 @@
 // and every endpoint field points at /auth.md, which says the same thing.
 // There is deliberately no jwks_uri: there are no keys.
 //
-// They are served by the Worker because GitHub Pages cannot give an
-// extensionless file the application/json type.
-
-import { staticDoc } from "./http.ts";
+// They are committed as static files generated from these constants (see
+// documents.ts), and _headers gives the two extensionless files the
+// application/json type.
 
 const SITE = "https://burrowsapps.com";
 const AUTH_MD = `${SITE}/auth.md`;
@@ -63,13 +62,4 @@ export const PROTECTED_RESOURCE: Record<string, unknown> = {
   ...DISCOVERY,
 };
 
-const BODIES: Readonly<Record<string, string>> = {
-  "/.well-known/oauth-authorization-server": JSON.stringify(AUTHORIZATION_SERVER, null, 2),
-  "/.well-known/oauth-protected-resource": JSON.stringify(PROTECTED_RESOURCE, null, 2),
-};
-
-export const OAUTH_PATHS: readonly string[] = Object.keys(BODIES);
-
-export function oauthDocument(request: Request, url: URL): Response {
-  return staticDoc(request, BODIES[url.pathname], "application/json", { "Cache-Control": "public, max-age=3600" });
-}
+export const OAUTH_PATHS: readonly string[] = ["/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"];

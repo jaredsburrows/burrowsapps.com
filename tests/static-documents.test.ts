@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { CATALOG_TYPE } from "../workers/agent-readiness/api.ts";
 import { DOCUMENTS } from "../workers/agent-readiness/documents.ts";
 import { CARD_PATH, CARD_WELL_KNOWN_PATH } from "../workers/agent-readiness/mcp.ts";
+import { OWNED_EXACT, isOwned } from "../workers/agent-readiness/router.ts";
 import { runsWorkerFirst, site } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
@@ -26,8 +27,11 @@ for (const [path, content] of Object.entries(DOCUMENTS)) {
   });
 }
 
-test("no generated document runs the Worker first", async () => {
-  for (const path of Object.keys(DOCUMENTS)) assert.ok(!runsWorkerFirst(path), `${path} matches run_worker_first`);
+test("no generated document is owned by the Worker or runs it first", async () => {
+  for (const path of Object.keys(DOCUMENTS)) {
+    assert.ok(!isOwned(path) && !OWNED_EXACT.includes(path), `${path} is owned by the Worker`);
+    assert.ok(!runsWorkerFirst(path), `${path} matches run_worker_first`);
+  }
 });
 
 test("the two server card paths have identical bytes", async () => {

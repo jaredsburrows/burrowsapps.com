@@ -4,6 +4,7 @@ import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { isOwned } from "../workers/agent-readiness/router.ts";
 import { resolveSiteUrl } from "./support/site-map.ts";
+import { publishedFile } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
 const read = (path: string): Promise<string> => readFile(new URL(path, REPO), "utf8");
@@ -36,10 +37,13 @@ for (const url of siteUrls(developers)) {
   });
 }
 
-test("developers.md names only endpoint paths the Worker owns", async () => {
+// A path the Worker answers, or a file the asset router serves.
+const servedPath = (path: string): boolean => isOwned(path) || publishedFile(path) !== null;
+
+test("developers.md names only paths that the Worker owns or that are published files", async () => {
   const paths = endpointPaths(developers);
   assert.ok(paths.includes("/api/v1/company"), paths.join(" "));
-  for (const path of paths) assert.ok(isOwned(path), `${path} is not owned by the Worker`);
+  for (const path of paths) assert.ok(servedPath(path), `${path} is neither owned by the Worker nor a published file`);
 });
 
 test("developers.md states the public limit that PUBLIC_LIMITER enforces", async () => {
@@ -87,8 +91,8 @@ test("every link in auth.md resolves to a file or a Worker path", async () => {
   for (const url of siteUrls(authMd)) assert.notEqual(resolveSiteUrl(url), null, `${url} does not resolve`);
 });
 
-test("auth.md names only endpoint paths the Worker owns, plus the contact form's", async () => {
-  for (const path of endpointPaths(authMd)) assert.ok(isOwned(path), `${path} is not owned by the Worker`);
+test("auth.md names only paths that the Worker owns or that are published files, plus the contact form's", async () => {
+  for (const path of endpointPaths(authMd)) assert.ok(servedPath(path), `${path} is neither owned by the Worker nor a published file`);
   for (const path of ["/api/v1", "/mcp", "/api/contact"]) assert.ok(authMd.includes(`\`${path}\``), `auth.md does not name ${path}`);
 });
 

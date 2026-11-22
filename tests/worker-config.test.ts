@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { PAGES } from "../workers/agent-readiness/handler.ts";
+import { OWNED_EXACT } from "../workers/agent-readiness/router.ts";
 import { resolveSiteUrl } from "./support/site-map.ts";
 import { publishedFile, publishedPaths, runsWorkerFirst, servedPath } from "./support/static-site.ts";
 
@@ -74,8 +75,8 @@ test("the assets settings are exactly the ones the Worker and the tests depend o
   });
 });
 
-test("every page the Worker decorates runs the Worker first", async () => {
-  for (const path of Object.keys(PAGES)) assert.ok(runsWorkerFirst(path), `${path} is not in run_worker_first`);
+test("every page the Worker decorates and every path it owns runs the Worker first", async () => {
+  for (const path of [...Object.keys(PAGES), ...OWNED_EXACT]) assert.ok(runsWorkerFirst(path), `${path} is not in run_worker_first`);
 });
 
 test("every page's asset path is served from an HTML file", async () => {
