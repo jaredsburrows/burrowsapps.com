@@ -65,9 +65,9 @@ test("entry identifiers are unique", async () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("the MCP server card entry points at the path the Worker serves the card from", async () => {
+test("the MCP server card entry points at the published server card file", async () => {
   const entry = (await readManifest()).entries.find((candidate) => candidate.type === "application/mcp-server-card+json");
   assert.ok(entry?.url, "no application/mcp-server-card+json entry");
   assert.equal(entry.url, "https://burrowsapps.com/mcp/server-card");
-  assert.equal(resolveSiteUrl(entry.url), "worker");
+  assert.equal(resolveSiteUrl(entry.url), "file");
 });

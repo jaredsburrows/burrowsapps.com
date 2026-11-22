@@ -70,6 +70,8 @@ function toolData(name: unknown): Record<string, unknown> | null {
 }
 
 const ENDPOINT_PATH = "/mcp";
+export const CARD_PATH = "/mcp/server-card";
+export const CARD_WELL_KNOWN_PATH = "/.well-known/mcp/server-card.json";
 
 // One document for both locations: the current server card format ($schema,
 // name, version, description, remotes) plus the SEP-1649 fields that older

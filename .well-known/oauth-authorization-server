@@ -1,0 +1,44 @@
+{
+  "status": "not_offered",
+  "available": false,
+  "message": "Burrows Applications has no login. No authorization server runs on this origin, and nothing here needs or accepts a credential.",
+  "description": "This document exists so that tools looking for OAuth metadata get an explicit answer. The standard fields are present because readers of this format expect them, and the grant, response, scope and identity values are placeholders: none describes a working flow. Every endpoint field points at https://burrowsapps.com/auth.md, which explains that there is no login. Clients must not attempt authorization, registration, claim or token requests.",
+  "issuer": "https://burrowsapps.com",
+  "authorization_endpoint": "https://burrowsapps.com/auth.md?endpoint=authorization",
+  "token_endpoint": "https://burrowsapps.com/auth.md?endpoint=token",
+  "grant_types_supported": [
+    "authorization_code"
+  ],
+  "response_types_supported": [
+    "code"
+  ],
+  "code_challenge_methods_supported": [
+    "S256"
+  ],
+  "scopes_supported": [
+    "public"
+  ],
+  "service_documentation": "https://burrowsapps.com/auth.md",
+  "agent_auth": {
+    "status": "not_offered",
+    "available": false,
+    "message": "Burrows Applications has no login. There is nothing to register, nothing to claim and no credential to obtain.",
+    "skill": "https://burrowsapps.com/auth.md",
+    "register_uri": "https://burrowsapps.com/auth.md?endpoint=register",
+    "claim_uri": "https://burrowsapps.com/auth.md?endpoint=claim",
+    "identity_types_supported": [
+      "anonymous"
+    ],
+    "anonymous": {
+      "status": "not_offered",
+      "available": false,
+      "message": "Every request to Burrows Applications is already anonymous. No credential is issued, and one sent is ignored.",
+      "credential_types_supported": [
+        "access_token"
+      ]
+    }
+  },
+  "mcp_url": "https://burrowsapps.com/mcp",
+  "mcp_server_card_url": "https://burrowsapps.com/.well-known/mcp/server-card.json",
+  "api_catalog_url": "https://burrowsapps.com/.well-known/api-catalog"
+}

@@ -2,7 +2,7 @@
 // on the site is real when it names a published file (one that exists and is
 // not in .assetsignore) or a path the Worker owns.
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { isOwned } from "../../workers/agent-readiness/router.ts";
 import { isIgnored } from "./static-site.ts";
 
@@ -19,7 +19,8 @@ export function resolveSiteUrl(raw: string): "file" | "worker" | null {
   if (url.origin !== SITE_ORIGIN) return null;
   const path = url.pathname.endsWith("/") ? `${url.pathname}index.html` : url.pathname;
   const relative = decodeURIComponent(path).slice(1);
-  if (existsSync(new URL(`./${relative}`, REPO)) && !isIgnored(relative)) return "file";
+  const file = new URL(`./${relative}`, REPO);
+  if (existsSync(file) && statSync(file).isFile() && !isIgnored(relative)) return "file";
   if (isOwned(url.pathname)) return "worker";
   return null;
 }

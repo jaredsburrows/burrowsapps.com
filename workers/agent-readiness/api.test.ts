@@ -122,7 +122,7 @@ test("4. the catalog's own entry lists every API anchor as an item with a title"
 
 // Pages serves .md files as text/markdown; everything else typed here is the Worker's.
 const servedType = async (href: string): Promise<string> => {
-  if (resolveSiteUrl(href) === "file") return href.endsWith(".md") ? "text/markdown" : "unknown";
+  if (resolveSiteUrl(href) === "file" && !isOwned(new URL(href).pathname)) return href.endsWith(".md") ? "text/markdown" : "unknown";
   const { response } = await call(new URL(href).pathname);
   assert.equal(response.status, 200, href);
   return (response.headers.get("Content-Type") ?? "").split(";")[0].trim();
