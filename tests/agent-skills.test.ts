@@ -14,7 +14,7 @@ const SCHEMA = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
 type Skill = { name: string; type: string; description: string; url: string; digest: string };
 type SkillsIndex = { $schema: string; skills: Skill[] };
 
-// Maps a URL on the site to the repo file GitHub Pages serves for it.
+// Maps a URL on the site to the repository file that is published at it.
 const repoFileFor = (url: URL): URL => {
   const path = url.pathname.endsWith("/") ? `${url.pathname}index.html` : url.pathname;
   return new URL(`.${path}`, REPO);

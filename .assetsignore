@@ -1,0 +1,30 @@
+# Everything in this directory is uploaded as a public file unless a line here
+# matches it, whether git tracks it or not. Same format as .gitignore.
+# tests/static-site.test.ts fails when a top-level entry is neither listed here
+# nor on the public list in tests/support/static-site.ts.
+
+# Tooling, editor, and local state
+.claude
+.editorconfig
+.git
+.gitattributes
+.gitignore
+.github
+.idea
+.team
+.wrangler
+node_modules
+package.json
+package-lock.json
+**/.DS_Store
+
+# Source, tests, and repository documents
+tests
+workers
+wrangler.jsonc
+LICENSE
+README.md
+
+# GitHub Pages files, kept until Pages is switched off
+CNAME
+.nojekyll
