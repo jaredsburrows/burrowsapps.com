@@ -14,7 +14,7 @@ const send = (request: Request) => {
 };
 
 test("paths that only look owned go to the origin untouched", async () => {
-  for (const path of ["//", "/API/v1/company", "/api/v1company", "/api/v1x", "/mcpx", "/mcp%2F", "/api/v1%2Fcompany", "/.well-known/api-catalog/", "/.well-known/API-catalog", "/api/contact", "/api/"]) {
+  for (const path of ["//", "/API/v1/company", "/api/v1company", "/api/v1x", "/mcpx", "/mcp%2F", "/a2ax", "/a2a%2F", "/api/v1%2Fcompany", "/.well-known/api-catalog/", "/.well-known/API-catalog", "/api/contact", "/api/"]) {
     const { response, deps } = await send(new Request(SITE + path));
     assert.equal(deps.originCalls.length, 1, path);
     assert.equal(response.status, 200, path);
@@ -30,7 +30,7 @@ test("another host is never answered by the Worker", async () => {
 });
 
 test("every owned path answers GET, HEAD, and OPTIONS, and refuses POST, PUT, and DELETE with Allow", async () => {
-  for (const path of OWNED_EXACT.filter((p) => p !== "/mcp")) {
+  for (const path of OWNED_EXACT.filter((p) => p !== "/mcp" && p !== "/a2a")) {
     for (const method of ["GET", "HEAD"]) {
       const { response, deps } = await send(new Request(SITE + path, { method }));
       assert.equal(response.status, 200, `${method} ${path}`);

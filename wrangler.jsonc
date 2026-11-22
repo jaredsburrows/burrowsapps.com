@@ -48,13 +48,14 @@
     // "/?sent=1" and "/?utm_source=x" run the Worker like "/".
     //   /, /privacy.html   Link headers, and markdown for Accept: text/markdown
     //   /mcp               the MCP server; "/mcp/server-card" is a file
+  //   /a2a               the A2A agent; its card is a file
     //   /api/v1 ...        the JSON API: rate limited, and /status needs a clock
     // Every request that matches a pattern here is a Worker request. Do not
     // add a pattern that matches a static file.
-    "run_worker_first": ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/*"]
+    "run_worker_first": ["/", "/privacy.html", "/mcp", "/a2a", "/api/v1", "/api/v1/*"]
   },
   // Per Cloudflare location and approximate, like the contact Worker's limits.
-  //   PUBLIC_LIMITER   60/min per IP: /api/v1 and POST /mcp
+  //   PUBLIC_LIMITER   60/min per IP: /api/v1, POST /mcp, and POST /a2a
   "ratelimits": [
     { "name": "PUBLIC_LIMITER", "namespace_id": "2001", "simple": { "limit": 60, "period": 60 } }
   ]

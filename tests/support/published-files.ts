@@ -8,6 +8,7 @@
 // and commit both files.
 
 export const PUBLISHED_FILES: readonly string[] = [
+  ".well-known/agent-card.json",
   ".well-known/agent-skills/contact-burrows-applications/SKILL.md",
   ".well-known/agent-skills/index.json",
   ".well-known/ai-catalog.json",

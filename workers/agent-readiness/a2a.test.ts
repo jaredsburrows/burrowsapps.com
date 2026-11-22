@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { A2A_VERSION, AGENT_CARD, AGENT_CARD_PATH, ANSWERS, SKILLS, endpoint } from "./a2a.ts";
+import { A2A_VERSION, AGENT_CARD, AGENT_CARD_PATH, ANSWERS, SKILLS } from "./a2a.ts";
 import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
-import { makeBaseEnv } from "./testing.ts";
+import { route } from "./router.ts";
+import { makeBaseEnv, makeDeps } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
 
 const ENDPOINT = "https://burrowsapps.com/a2a";
@@ -17,7 +18,7 @@ type Rpc = {
 };
 
 const send = async (init: RequestInit, env: TestEnv = makeBaseEnv(), url = ENDPOINT): Promise<Response> =>
-  endpoint(new Request(url, init), env);
+  route(new Request(url, init), env, makeDeps());
 
 const post = (body: unknown, headers: Record<string, string | null> = {}): RequestInit => {
   const all: Record<string, string> = { "Content-Type": "application/json", "A2A-Version": "1.0" };
@@ -128,6 +129,7 @@ test("card: input is text, output is text and JSON", () => {
 
 test("card: every URL on it is a published file or a path the Worker owns", () => {
   const value = card();
+  for (const { url } of value.supportedInterfaces) assert.equal(resolveSiteUrl(url), "worker", url);
   for (const url of [value.provider.url, value.iconUrl, value.documentationUrl]) {
     assert.equal(resolveSiteUrl(url), "file", url);
   }

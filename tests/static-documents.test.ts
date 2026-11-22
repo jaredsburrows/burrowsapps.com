@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { AGENT_CARD_PATH } from "../workers/agent-readiness/a2a.ts";
 import { CATALOG_TYPE } from "../workers/agent-readiness/api.ts";
 import { DOCUMENTS } from "../workers/agent-readiness/documents.ts";
 import { CARD_PATH, CARD_WELL_KNOWN_PATH } from "../workers/agent-readiness/mcp.ts";
@@ -11,8 +12,9 @@ const REPO = new URL("../", import.meta.url);
 const SITE = "https://burrowsapps.com";
 const committed = (path: string): Promise<string> => readFile(new URL(`.${path}`, REPO), "utf8");
 
-test("there are five generated documents", async () => {
+test("there are six generated documents", async () => {
   assert.deepEqual(Object.keys(DOCUMENTS).sort(), [
+    "/.well-known/agent-card.json",
     "/.well-known/api-catalog",
     "/.well-known/mcp/server-card.json",
     "/.well-known/oauth-authorization-server",
@@ -45,6 +47,7 @@ const SERVED: Readonly<Record<string, { type: string; maxAge: number }>> = {
   "/.well-known/oauth-protected-resource": { type: "application/json", maxAge: 3600 },
   [CARD_WELL_KNOWN_PATH]: { type: "application/json", maxAge: 3600 },
   [CARD_PATH]: { type: "application/mcp-server-card+json", maxAge: 3600 },
+  [AGENT_CARD_PATH]: { type: "application/json", maxAge: 3600 },
 };
 
 test("every generated document has an expected type and cache lifetime", async () => {

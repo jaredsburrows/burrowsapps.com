@@ -181,8 +181,8 @@ test("other methods on the two pages reach the binding and get its 405", async (
   }
 });
 
-test("OPTIONS on the MCP server and the API is the Worker's preflight", async () => {
-  for (const path of ["/mcp", "/api/v1/company"]) {
+test("OPTIONS on the MCP server, the A2A agent, and the API is the Worker's preflight", async () => {
+  for (const path of ["/mcp", "/a2a", "/api/v1/company"]) {
     const response = await get(path, { method: "OPTIONS" });
     assert.equal(response.status, 204, path);
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*", path);
