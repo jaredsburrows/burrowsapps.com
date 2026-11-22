@@ -4,7 +4,7 @@
 // Its Agent Card is a static file generated from AGENT_CARD (see documents.ts).
 
 import { COMPANY, CONTACT, SERVICES, contactOptions } from "./facts.ts";
-import { json } from "./http.ts";
+import { allow, clientIp, isObject, json, preflight, readBody, validOrigin } from "./http.ts";
 import type { Env } from "./http.ts";
 
 export const A2A_VERSION = "1.0";
@@ -105,6 +105,117 @@ export function helpAnswer(): Answer {
   };
 }
 
-export async function endpoint(_request: Request, _env: Env): Promise<Response> {
-  return json(200, { jsonrpc: "2.0", id: null, error: { code: -32601, message: "Method not found" } });
+const MAX_BODY = 65536;
+const MAX_ID_LENGTH = 128;
+const VERSION_PATTERN = /^(\d+)\.(\d+)(?:\.\d+)?$/;
+// What an empty or missing A2A-Version means, per the specification.
+const DEFAULT_VERSION = "0.3";
+const NO_STORE = { "Cache-Control": "no-store" };
+
+type Id = string | number;
+type RpcRequest = { jsonrpc: "2.0"; method: string; id?: Id; params?: unknown };
+
+// The A2A errors, each with the ErrorInfo reason its data array carries.
+// Standard JSON-RPC errors carry no data.
+const REASONS: Readonly<Record<number, string>> = {
+  [-32001]: "TASK_NOT_FOUND",
+  [-32003]: "PUSH_NOTIFICATION_NOT_SUPPORTED",
+  [-32004]: "UNSUPPORTED_OPERATION",
+  [-32005]: "CONTENT_TYPE_NOT_SUPPORTED",
+  [-32009]: "VERSION_NOT_SUPPORTED",
+};
+
+function errorInfo(code: number): unknown[] | undefined {
+  const reason = REASONS[code];
+  if (reason === undefined) return undefined;
+  const info: Record<string, unknown> = { "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason, domain: "a2a-protocol.org" };
+  if (code === -32009) info.metadata = { supportedVersions: A2A_VERSION };
+  return [info];
+}
+
+function rpcResult(id: Id, result: unknown): Response {
+  return json(200, { jsonrpc: "2.0", id, result }, NO_STORE);
+}
+
+// id undefined: omitted (the body was never read). id null: the body was read
+// but no usable id was found in it.
+function rpcError(
+  id: Id | null | undefined,
+  code: number,
+  message: string,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
+  const data = errorInfo(code);
+  const error = data === undefined ? { code, message } : { code, message, data };
+  return json(status, { jsonrpc: "2.0", ...(id === undefined ? {} : { id }), error }, { ...NO_STORE, ...headers });
+}
+
+function accepted(): Response {
+  return new Response(null, { status: 202, headers: { "Access-Control-Allow-Origin": "*", ...NO_STORE } });
+}
+
+const validId = (id: unknown): id is Id =>
+  (typeof id === "string" && id.length <= MAX_ID_LENGTH) || (typeof id === "number" && Number.isFinite(id));
+
+function acceptedContentType(header: string | null): boolean {
+  const type = (header ?? "").toLowerCase();
+  return type.startsWith("application/json") || type.startsWith("application/a2a+json");
+}
+
+// The A2A-Version header, else the query parameter. The value is compared as
+// Major.Minor and never echoed.
+function supportedVersion(request: Request): boolean {
+  const header = request.headers.get("A2A-Version")?.trim() ?? "";
+  const query = new URL(request.url).searchParams.get("A2A-Version")?.trim() ?? "";
+  const match = VERSION_PATTERN.exec(header || query || DEFAULT_VERSION);
+  return match !== null && `${match[1]}.${match[2]}` === A2A_VERSION;
+}
+
+function dispatch(id: Id, _method: string, _params: Record<string, unknown>): Response {
+  return rpcError(id, -32601, "Method not found");
+}
+
+export async function endpoint(request: Request, env: Env): Promise<Response> {
+  if (request.method === "OPTIONS") {
+    return preflight("POST, OPTIONS", "Content-Type, Accept, A2A-Version, A2A-Extensions");
+  }
+  if (request.method !== "POST") {
+    return rpcError(undefined, -32600, "Method not allowed. Send JSON-RPC over POST.", 405, { Allow: "POST, OPTIONS" });
+  }
+  // The agent holds no credentials and no private data, so any web origin may
+  // call it; the check rejects only malformed origins.
+  if (!validOrigin(request.headers.get("Origin"))) return rpcError(undefined, -32600, "Origin not allowed", 403);
+  if (!(await allow(env.PUBLIC_LIMITER, clientIp(request), "open"))) {
+    return rpcError(undefined, 429, "Too many requests", 429, { "Retry-After": "60" });
+  }
+  if (!acceptedContentType(request.headers.get("Content-Type"))) {
+    return rpcError(undefined, -32600, "Content-Type must be application/json", 415);
+  }
+  const text = await readBody(request, MAX_BODY);
+  if (text === null) return rpcError(undefined, -32600, "Request too large", 413);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return rpcError(null, -32700, "Parse error");
+  }
+  if (Array.isArray(parsed)) return rpcError(null, -32600, "Batch requests are not supported");
+  if (
+    !isObject(parsed)
+    || parsed.jsonrpc !== "2.0"
+    || typeof parsed.method !== "string"
+    || ("id" in parsed && !validId(parsed.id))
+  ) {
+    return rpcError(null, -32600, "Invalid Request");
+  }
+  const message = parsed as RpcRequest;
+  // A notification: A2A defines none, so nothing is processed.
+  if (message.id === undefined) return accepted();
+  const id = message.id;
+  if (!supportedVersion(request)) return rpcError(id, -32009, "Version not supported");
+  if (message.params !== undefined && !isObject(message.params)) return rpcError(id, -32602, "Invalid params");
+  const params = isObject(message.params) ? message.params : {};
+  if (params.tenant !== undefined && params.tenant !== "") return rpcError(id, -32602, "Unknown tenant");
+  return dispatch(id, message.method, params);
 }
