@@ -85,7 +85,7 @@ The paths the Worker answers itself never fall through to a file; an internal er
 
 Every other path is a file and costs no Worker request. A path with no file gets `404.html` with status `404`. `/index.html` and `/404.html` redirect to `/` and `/404`.
 
-- `_headers` sets CORS and `nosniff` on every file, cache lifetimes for `static/` and the favicon, the markdown content type, and the type, cache, and `Link` headers of the generated documents. Responses built by the Worker set their own headers in code. `/` must never be given a cache lifetime: it has two representations, and a test fails if a rule for it is added.
+- `_headers` sets CORS and `nosniff` on every file, cache lifetimes for `static/` and the favicon, the markdown content type, and the type, cache, and `Link` headers of the generated documents. Responses the Worker builds itself (the API, the MCP server, the markdown variants) set their own headers in code; the two HTML pages, read through the binding, keep the headers `_headers` gives their files. `/` must never be given a cache lifetime: it has two representations, and a test fails if a rule for it is added.
 - `.assetsignore` is an allowlist generated from `PUBLISHED_FILES` in `tests/support/published-files.ts`: it ignores everything, then re-includes each published folder and file. `wrangler deploy` uploads the working tree, not only committed files, so a denylist would publish any stray file (a `.env`, a `.dev.vars`, a backup). A test fails when `.assetsignore` differs from the list, when a listed file is missing, or when a file in a published folder is not listed.
 
 Workers Free allows 100,000 Worker requests a day per account, shared with the contact Worker. Files do not count. Over the limit, files are still served, and `/`, `/privacy.html`, `/mcp`, and `/api/v1` answer `429` until the daily reset.
@@ -94,7 +94,7 @@ Until GitHub Pages is switched off, an uncaught error in the Worker falls back t
 
 #### Deploy
 
-CI deploys: `.github/workflows/build.yml` runs the checks, and on a push to `gh-pages` the "Deploy to Cloudflare" job runs `wrangler deploy` in the GitHub Environment `production`. That environment is restricted to the `gh-pages` branch and holds the secret `CLOUDFLARE_API_TOKEN`; it is not a repository secret, so a workflow edited on another branch cannot read it. The token is a Cloudflare user API token with exactly one permission, Account > Workers Scripts > Edit. Pull requests run only the checks, ending with a credential-free `wrangler deploy --dry-run`.
+CI deploys: `.github/workflows/build.yml` runs the checks, and on a push to `gh-pages` the "Deploy to Cloudflare" job runs `wrangler deploy` in the GitHub Environment `production`. That environment is restricted to the `gh-pages` branch and holds the secret `CLOUDFLARE_API_TOKEN`; it is not a repository secret, so a workflow edited on another branch cannot read it. The token is a Cloudflare user API token with exactly one permission, Account > Workers Scripts > Edit. Cloudflare cannot scope it to one Worker: it can replace or delete every Worker in the account, the contact Worker included. Give it an expiry (a year at most) and rotate it before then; never widen it. Pull requests run only the checks, ending with a credential-free `wrangler deploy --dry-run`.
 
 To deploy again without a new commit, run the workflow from the Actions tab on `gh-pages`.
 
@@ -109,7 +109,7 @@ npx wrangler rollback <version-id>
 
 - Workers Routes: `burrowsapps.com/*` on the Worker `burrowsapps-com`. It is not in `wrangler.jsonc`, so a deploy never changes it and the deploy token needs no zone permission. The contact Worker's routes, `burrowsapps.com/api/contact*` and `www.burrowsapps.com/api/contact*`, are more specific and win.
 - Redirect Rule for `www`: filter `(http.host eq "www.burrowsapps.com" and not starts_with(http.request.uri.path, "/api/contact"))`, dynamic target `concat("https://burrowsapps.com", http.request.uri.path)`, status `301`, query string preserved.
-- Apex DNS: until GitHub Pages is switched off, the apex keeps its GitHub Pages `A` and `AAAA` records, proxied. They are then replaced by one proxied placeholder, `AAAA` `@` `100::`, added before the old records are deleted. The `www` CNAME stays.
+- Apex DNS: until the move is verified, the apex keeps its GitHub Pages `A` and `AAAA` records, proxied. They are then replaced by one proxied placeholder, `AAAA` `@` `100::`, added before the old records are deleted. The apex records move off GitHub before GitHub Pages is switched off, never the other way around: a GitHub-pointing record with Pages off lets anyone claim the name on their own Pages site. The `www` record is a proxied CNAME to the apex, not to GitHub, and stays.
 - The DNS-AID record below.
 
 #### DNS records
