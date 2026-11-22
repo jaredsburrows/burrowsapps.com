@@ -127,10 +127,9 @@ for (const { path, html, markdown: markdownPath } of PAGES) {
 }
 
 // The real asset router answers a request for "/privacy.html" with a 307 to
-// "/privacy". The fail-open retry asks for the visitor's own path, so a
-// transient failure on the first read sends the visitor to the undecorated
-// page instead of serving it. Today's site serves the page on the retry.
-test("B13: /privacy.html after one failed read is served, not redirected", { todo: "B13" }, async (t) => {
+// "/privacy". The fail-open retry asks for the path the page is served at, so
+// a transient failure on the first read still serves the page.
+test("B13: /privacy.html after one failed read is served, not redirected", async (t) => {
   t.mock.method(console, "error", () => {});
   const router: Answer = (request, call) => {
     const pathname = new URL(request.url).pathname;

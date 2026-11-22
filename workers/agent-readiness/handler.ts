@@ -102,6 +102,18 @@ function varyCoversAccept(vary: string | null): boolean {
   return (vary ?? "").split(",").some((token) => ["accept", "*"].includes(token.trim().toLowerCase()));
 }
 
+// The request to send the asset router for a page's HTML. It serves
+// privacy.html at "/privacy" and answers a request for "/privacy.html" with a
+// redirect there, so a GET or HEAD for a page asks for the path it serves,
+// with the visitor's own method and headers. Any other request is unchanged.
+export function assetRequest(request: Request): Request {
+  if (request.method !== "GET" && request.method !== "HEAD") return request;
+  const url = new URL(request.url);
+  const page = PAGES[url.pathname];
+  if (!page || page.asset === url.pathname) return request;
+  return new Request(new URL(page.asset, url), request);
+}
+
 export async function handle(request: Request, originFetch: OriginFetch): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return originFetch(request);
   // The query string is ignored, so "/?sent=1" and "/?utm_source=x" are decorated as "/".
@@ -118,12 +130,8 @@ export async function handle(request: Request, originFetch: OriginFetch): Promis
     }
   }
 
-  // The asset router serves privacy.html at "/privacy" and answers a request
-  // for "/privacy.html" with a redirect there. Ask for the path it serves,
-  // with the visitor's own method and headers.
-  const pageRequest = page.asset === url.pathname ? request : new Request(new URL(page.asset, url), request);
   // Errors here propagate; the router owns the last retry.
-  const response = await originFetch(pageRequest);
+  const response = await originFetch(assetRequest(request));
   try {
     if (response.status !== 200 && response.status !== 304) return response;
     const out = new Response(response.body, response);

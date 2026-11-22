@@ -10,7 +10,7 @@
 // everything else, failing open means serving the plain file.
 
 import { handle as api } from "./api.ts";
-import { handle } from "./handler.ts";
+import { assetRequest, handle } from "./handler.ts";
 import { CARD_PATH, endpoint as mcp } from "./mcp.ts";
 import { json } from "./http.ts";
 import type { Deps, Env } from "./http.ts";
@@ -95,9 +95,10 @@ export async function route(request: Request, env: Env, deps: Deps): Promise<Res
   try {
     response = await handle(request, deps.originFetch);
   } catch (error) {
-    // Fail open: serve the plain file, undecorated.
+    // Fail open: serve the plain file, undecorated, from the path the asset
+    // router serves it at ("/privacy", not the redirect at "/privacy.html").
     console.error("agent-readiness failed open:", String(error));
-    response = await deps.originFetch(request);
+    response = await deps.originFetch(assetRequest(request));
   }
   try {
     logProbe(request, url, response, deps);
