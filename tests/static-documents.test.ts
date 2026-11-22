@@ -67,6 +67,16 @@ for (const [path, { type, maxAge }] of Object.entries(SERVED)) {
   });
 }
 
+test("the generated documents answer other methods with the asset router's 405", async () => {
+  for (const path of Object.keys(DOCUMENTS)) {
+    for (const method of ["POST", "OPTIONS"]) {
+      const response = await site(new Request(`${SITE}${path}`, { method }));
+      assert.equal(response.status, 405, `${method} ${path}`);
+      assert.equal(await response.text(), "", `${method} ${path}`);
+    }
+  }
+});
+
 test("the catalog carries its own api-catalog Link header", async () => {
   const response = await site(new Request(`${SITE}/.well-known/api-catalog`));
   assert.equal(response.headers.get("Link"), '</.well-known/api-catalog>; rel="api-catalog"');

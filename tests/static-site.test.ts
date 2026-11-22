@@ -141,3 +141,17 @@ test("/privacy.html is the decorated page, not the asset router's redirect", asy
   assert.equal(plain.status, 307);
   assert.equal(plain.headers.get("Location"), "/privacy");
 });
+
+test("a method other than GET or HEAD on a file is a 405 from the asset router", async () => {
+  for (const [path, method] of [["/robots.txt", "POST"], ["/.well-known/ard.json", "OPTIONS"], ["/index.md", "PUT"]]) {
+    const response = await get(path, { method });
+    assert.equal(response.status, 405, `${method} ${path}`);
+    assert.equal(await response.text(), "", `${method} ${path}`);
+  }
+});
+
+test("files are typed by extension as Cloudflare infers it", async () => {
+  assert.equal((await get("/favicon.ico")).headers.get("Content-Type"), "image/vnd.microsoft.icon");
+  assert.equal((await get("/robots.txt")).headers.get("Content-Type"), "text/plain; charset=utf-8");
+  assert.equal((await get("/sitemap.xml")).headers.get("Content-Type"), "application/xml");
+});

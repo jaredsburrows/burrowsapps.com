@@ -29,8 +29,8 @@ export const PUBLIC_TOP_LEVEL: readonly string[] = [
   "static",
 ];
 
-// Read by wrangler at deploy time and not published (checked by the local
-// preview before the merge).
+// Read by wrangler at deploy time and not published (both answer 404 under
+// wrangler dev).
 export const CONSUMED_TOP_LEVEL: readonly string[] = ["_headers", ".assetsignore"];
 
 // The non-comment, non-blank lines of .assetsignore.
@@ -163,11 +163,12 @@ export function headersFor(pathname: string): Headers {
   return headers;
 }
 
-// Assumption, checked under wrangler dev and after the deploy: the type
-// Cloudflare infers from each extension. ".md" and extensionless files get no
-// type here, so they are usable only through a Content-Type rule in _headers.
+// The type Cloudflare infers from each extension, as measured under wrangler
+// dev. Extensionless files get no type here, so they are usable only through
+// a Content-Type rule in _headers.
 const TYPES: Readonly<Record<string, string>> = {
   ".html": "text/html; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
   ".json": "application/json",
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml",
@@ -175,7 +176,7 @@ const TYPES: Readonly<Record<string, string>> = {
   ".js": "text/javascript; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
-  ".ico": "image/x-icon",
+  ".ico": "image/vnd.microsoft.icon",
 };
 
 // Cloudflare's Cache-Control on every asset that _headers gives none
@@ -220,7 +221,9 @@ export async function assetFetch(request: Request): Promise<Response> {
 // The deployed site: the asset router in front of the Worker.
 //   - A path in run_worker_first runs the Worker, which reads files through
 //     env.ASSETS (here, assetFetch).
-//   - Otherwise a GET or HEAD for a file is answered by the asset router.
+//   - Otherwise a request for a file is answered by the asset router: a GET
+//     or HEAD with the file, any other method with 405 and no body, without
+//     running the Worker (measured under wrangler dev).
 //   - Otherwise a browser navigation gets the 404 page without the Worker
 //     (Static Assets, "Routing": Sec-Fetch-Mode navigate).
 //   - Anything else runs the Worker, as a request that matches no file does.
@@ -229,8 +232,10 @@ export async function site(request: Request, env: TestEnv = makeBaseEnv()): Prom
   const deps = makeDeps();
   deps.setOrigin(assetFetch);
   if (runsWorkerFirst(pathname)) return route(request, env, deps);
-  const isRead = request.method === "GET" || request.method === "HEAD";
-  if (isRead && (publishedFile(pathname) !== null || htmlRedirect(pathname) !== null)) return assetFetch(request);
+  if (publishedFile(pathname) !== null || htmlRedirect(pathname) !== null) {
+    const isRead = request.method === "GET" || request.method === "HEAD";
+    return isRead ? assetFetch(request) : new Response(null, { status: 405 });
+  }
   if (request.headers.get("Sec-Fetch-Mode") === "navigate") return assetFetch(request);
   return route(request, env, deps);
 }
