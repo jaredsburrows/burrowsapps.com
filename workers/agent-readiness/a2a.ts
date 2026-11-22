@@ -247,8 +247,10 @@ function sendMessage(id: Id, params: Record<string, unknown>): Response {
     if (parts.some((part) => part.text !== undefined && typeof part.text !== "string")) return rpcError(id, -32602, "Invalid params");
     return rpcError(id, -32005, "Content type not supported");
   }
-  if (message.taskId !== undefined) return rpcError(id, -32001, "Task not found");
-  if (message.contextId !== undefined && (typeof message.contextId !== "string" || !CONTEXT_ID.test(message.contextId))) {
+  // ProtoJSON reads a null field as absent.
+  if (message.taskId !== undefined && message.taskId !== null) return rpcError(id, -32001, "Task not found");
+  const requestedContext = message.contextId ?? undefined;
+  if (requestedContext !== undefined && (typeof requestedContext !== "string" || !CONTEXT_ID.test(requestedContext))) {
     return rpcError(id, -32602, "Invalid params");
   }
   const configuration = params.configuration ?? {};
@@ -263,7 +265,7 @@ function sendMessage(id: Id, params: Record<string, unknown>): Response {
   const text = parts.map((part) => part.text).join(" ").toLowerCase().replace(/\s+/g, " ").replaceAll("\u2019", "'").trim();
   const skillId = chooseSkill(message, params, text);
   const answer = skillId === "help" ? helpAnswer() : ANSWERS[skillId]();
-  const contextId = typeof message.contextId === "string" ? message.contextId : crypto.randomUUID();
+  const contextId = typeof requestedContext === "string" ? requestedContext : crypto.randomUUID();
   const reply = buildReply(skillId, answer, contextId, modes);
   if (reply === null) return rpcError(id, -32005, "Content type not supported");
   return rpcResult(id, reply);

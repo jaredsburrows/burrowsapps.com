@@ -267,6 +267,15 @@ test("SendMessage: the reply never repeats the user's text", async () => {
   }
 });
 
+test("SendMessage: taskId null is no taskId", async () => {
+  expectSkill(await expectMessage(await send(say("services", { extra: { taskId: null } }))), "services");
+});
+
+test("SendMessage: contextId null is no contextId, and a fresh UUID is used", async () => {
+  const message = await expectMessage(await send(say("services", { extra: { contextId: null } })));
+  assert.match(message.contextId, UUID);
+});
+
 test("SendMessage: a supplied contextId is returned unchanged", async () => {
   const message = await expectMessage(await send(say("hello", { contextId: "ctx-1.a:b_c" })));
   assert.equal(message.contextId, "ctx-1.a:b_c");
