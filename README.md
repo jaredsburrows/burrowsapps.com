@@ -55,7 +55,7 @@ The tests fail when any of these drift:
 - Edit the company facts in `workers/agent-readiness/facts.ts`: they must still appear in `index.md` or `SKILL.md`, and the form limits must equal the ones in `workers/contact/index.js`.
 - Change `PUBLIC_LIMITER` in the root `wrangler.jsonc`: change the figure in `developers.md` too.
 - Edit `CATALOG`, `CARD`, or the OAuth documents: run `node workers/agent-readiness/tools/write-documents.ts` and commit the result.
-- Add a file or folder at the repository root: put it on the public list in `tests/support/static-site.ts` or in `.assetsignore`.
+- Publish a new file: add it to `PUBLISHED_FILES` in `tests/support/published-files.ts`, run `node tests/support/write-assetsignore.ts`, and commit both. Nothing else is uploaded.
 - Edit `SKILL.md`: recompute its digest and put it in `index.json` as `sha256:<hash>`:
 
   ```
@@ -86,7 +86,7 @@ The paths the Worker answers itself never fall through to a file; an internal er
 Every other path is a file and costs no Worker request. A path with no file gets `404.html` with status `404`. `/index.html` and `/404.html` redirect to `/` and `/404`.
 
 - `_headers` sets CORS and `nosniff` on every file, cache lifetimes for `static/` and the favicon, the markdown content type, and the type, cache, and `Link` headers of the generated documents. Responses built by the Worker set their own headers in code. `/` must never be given a cache lifetime: it has two representations, and a test fails if a rule for it is added.
-- `.assetsignore` lists what is not published: tooling and local state, `tests`, `workers`, `wrangler.jsonc`, `README.md`, `LICENSE`, `CNAME`, and `.nojekyll`. `wrangler deploy` uploads the working tree, not only committed files, so everything not listed there becomes a public URL. A test fails when a top-level entry is in neither list.
+- `.assetsignore` is an allowlist generated from `PUBLISHED_FILES` in `tests/support/published-files.ts`: it ignores everything, then re-includes each published folder and file. `wrangler deploy` uploads the working tree, not only committed files, so a denylist would publish any stray file (a `.env`, a `.dev.vars`, a backup). A test fails when `.assetsignore` differs from the list, when a listed file is missing, or when a file in a published folder is not listed.
 
 Workers Free allows 100,000 Worker requests a day per account, shared with the contact Worker. Files do not count. Over the limit, files are still served, and `/`, `/privacy.html`, `/mcp`, and `/api/v1` answer `429` until the daily reset.
 

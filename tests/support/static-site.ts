@@ -1,64 +1,43 @@
 // The deployed site, emulated from the repository. Cloudflare is given this
-// directory, .assetsignore, _headers, and wrangler.jsonc; the functions here
-// read the same inputs and apply the rules Cloudflare documents for them, so
+// directory, .assetsignore (generated from PUBLISHED_FILES), _headers, and
+// wrangler.jsonc; the functions here read the same inputs and apply the rules
+// Cloudflare documents for them, as measured under wrangler dev, so
 // tests can check what will be served and not only what the Worker returns.
 // Each rule names the Cloudflare Workers documentation page it follows.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { route } from "../../workers/agent-readiness/router.ts";
 import { makeBaseEnv, makeDeps } from "../../workers/agent-readiness/testing.ts";
 import type { TestEnv } from "../../workers/agent-readiness/testing.ts";
+import { PUBLISHED_FILES } from "./published-files.ts";
 
 const REPO = new URL("../../", import.meta.url);
 
-// Top-level entries that are published. Every other entry in the repository
-// root must be matched by .assetsignore or be one of CONSUMED_TOP_LEVEL.
-export const PUBLIC_TOP_LEVEL: readonly string[] = [
-  ".well-known",
-  "404.html",
-  "auth.md",
-  "developers.md",
-  "favicon.ico",
-  "index.html",
-  "index.md",
-  "mcp",
-  "privacy.html",
-  "privacy.md",
-  "robots.txt",
-  "sitemap.xml",
-  "static",
-];
-
-// Read by wrangler at deploy time and not published (both answer 404 under
-// wrangler dev).
-export const CONSUMED_TOP_LEVEL: readonly string[] = ["_headers", ".assetsignore"];
-
-// The non-comment, non-blank lines of .assetsignore.
-export function ignoreRules(): string[] {
-  return readFileSync(new URL(".assetsignore", REPO), "utf8")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "" && !line.startsWith("#"));
-}
-
-// .assetsignore uses the .gitignore format (Static Assets, "Ignoring
-// assets"). Only two forms are used, and a test rejects any other: a bare
-// name, which matches that name at any depth, and "**/name", which means the
-// same.
-export function isIgnored(relativePath: string): boolean {
-  const names = ignoreRules().map((rule) => (rule.startsWith("**/") ? rule.slice(3) : rule));
-  return relativePath.split("/").some((segment) => names.includes(segment));
+// True when the file is uploaded: .assetsignore re-includes exactly the files
+// in PUBLISHED_FILES. The match is exact and case-sensitive, as the asset
+// router's is (measured under wrangler dev: "/ROBOTS.TXT" is a 404), even on
+// a case-insensitive filesystem.
+export function isPublished(relative: string): boolean {
+  return PUBLISHED_FILES.includes(relative);
 }
 
 // Every file that is uploaded, as a path relative to the repository root.
 export function publishedPaths(): string[] {
-  const walk = (folder: string): string[] =>
-    readdirSync(new URL(`./${folder}`, REPO), { withFileTypes: true }).flatMap((entry) => {
-      const relative = `${folder}${entry.name}`;
-      if (isIgnored(relative) || (folder === "" && CONSUMED_TOP_LEVEL.includes(entry.name))) return [];
-      return entry.isDirectory() ? walk(`${relative}/`) : [relative];
-    });
-  return walk("").sort();
+  return [...PUBLISHED_FILES].sort();
+}
+
+// True when the file exists with exactly this spelling, checked against the
+// directory listings so that a case-insensitive filesystem cannot pass a
+// path that would not exist on Linux.
+export function existsExactly(relative: string): boolean {
+  let folder = REPO;
+  const parts = relative.split("/");
+  for (const [index, part] of parts.entries()) {
+    if (!existsSync(folder) || !readdirSync(folder).includes(part)) return false;
+    folder = new URL(`./${part}${index < parts.length - 1 ? "/" : ""}`, folder);
+  }
+  return statSync(folder).isFile();
 }
 
 // The URL the asset router serves a file at: "a/index.html" at "/a/",
@@ -70,13 +49,17 @@ export function servedPath(relative: string): string {
   return `/${relative}`;
 }
 
-const isFile = (url: URL): boolean => existsSync(url) && statSync(url).isFile();
+type Resolved = { file: string } | { redirect: string } | null;
 
-// The repository file the asset router serves for a path, or null when none
-// is served, under the default html_handling "auto-trailing-slash" (Static
-// Assets, "HTML handling"). A path ending in ".html" is answered with a
-// redirect, not a file.
-export function publishedFile(pathname: string): URL | null {
+// How the asset router answers a path under html_handling
+// "auto-trailing-slash" (Static Assets, "HTML handling"), as measured under
+// wrangler dev:
+//   "/" and "/a/" serve "index.html" in that folder; "/a" serves "a" or
+//   "a.html"; "/a.html" and "/a/index.html" are a 307 to "/a" and "/a/";
+//   "/a/" is a 307 to "/a" when only "a.html" exists; "//" is a 307 to "/".
+// Redirects keep the query string. A folder with no index.html is no file:
+// "/static" and "/static/" are 404s.
+function resolve(pathname: string): Resolved {
   let path: string;
   try {
     path = decodeURIComponent(pathname);
@@ -84,17 +67,28 @@ export function publishedFile(pathname: string): URL | null {
     return null;
   }
   if (!path.startsWith("/")) return null;
-  // Only plain paths: no empty, "." or ".." segment before the last one.
-  const folders = path.slice(1).split("/").slice(0, -1);
-  if (folders.some((segment) => segment === "" || segment === "." || segment === "..")) return null;
-  if (/\/\.\.?$/.test(path)) return null;
-  const candidate = (relative: string): URL | null => {
-    const file = new URL(`./${relative}`, REPO);
-    return !isIgnored(relative) && !CONSUMED_TOP_LEVEL.includes(relative) && isFile(file) ? file : null;
-  };
-  if (path.endsWith("/")) return candidate(`${path.slice(1)}index.html`);
-  if (path.endsWith(".html")) return null;
-  return candidate(path.slice(1)) ?? candidate(`${path.slice(1)}.html`);
+  if (path.includes("//")) {
+    const collapsed = path.replace(/\/{2,}/g, "/");
+    return resolve(collapsed) === null ? null : { redirect: collapsed };
+  }
+  const relative = path.slice(1);
+  if (relative.split("/").some((segment) => segment === "." || segment === "..")) return null;
+  if (path.endsWith(".html")) return isPublished(relative) ? { redirect: servedPath(relative) } : null;
+  if (path.endsWith("/")) {
+    if (isPublished(`${relative}index.html`)) return { file: `${relative}index.html` };
+    if (path !== "/" && isPublished(`${relative.slice(0, -1)}.html`)) return { redirect: path.slice(0, -1) };
+    return null;
+  }
+  if (isPublished(relative)) return { file: relative };
+  if (isPublished(`${relative}.html`)) return { file: `${relative}.html` };
+  return null;
+}
+
+// The repository file the asset router serves for a path, or null when it
+// serves none (a redirect, or no file).
+export function publishedFile(pathname: string): URL | null {
+  const resolved = resolve(pathname);
+  return resolved !== null && "file" in resolved ? new URL(`./${resolved.file}`, REPO) : null;
 }
 
 type SiteConfig = { assets: { run_worker_first: string[] } };
@@ -189,41 +183,56 @@ const extension = (path: string): string => {
   return dot > 0 ? name.slice(dot) : "";
 };
 
-// For a path ending in ".html" whose file is published, the path the asset
-// router redirects it to: "/index.html" to "/", "/privacy.html" to "/privacy"
-// (Static Assets, "HTML handling").
-function htmlRedirect(pathname: string): string | null {
-  if (!pathname.endsWith(".html")) return null;
-  const relative = pathname.slice(1);
-  if (isIgnored(relative) || !isFile(new URL(`./${relative}`, REPO))) return null;
-  return servedPath(relative);
-}
+const isRead = (request: Request): boolean => request.method === "GET" || request.method === "HEAD";
 
-// What env.ASSETS.fetch() is documented to answer. Only the path is used
-// (Static Assets, "Binding"). A path with no file gets 404.html with status
-// 404, because not_found_handling is "404-page".
+// What env.ASSETS.fetch() answers. Only the path is used (Static Assets,
+// "Binding"). A file or a redirect is answered for GET and HEAD; any other
+// method on such a path is a 405 with no body. A path with no file gets
+// 404.html with status 404 (not_found_handling "404-page"), with the _headers
+// rules for its path.
 export async function assetFetch(request: Request): Promise<Response> {
-  const { pathname } = new URL(request.url);
-  const location = htmlRedirect(pathname);
-  if (location !== null) return new Response(null, { status: 307, headers: { Location: location } });
-  const file = publishedFile(pathname);
-  if (file === null) {
-    const body = request.method === "HEAD" ? null : readFileSync(new URL("404.html", REPO));
-    return new Response(body, { status: 404, headers: { "Content-Type": TYPES[".html"] } });
+  const { pathname, search } = new URL(request.url);
+  const resolved = resolve(pathname);
+  if (resolved !== null && !isRead(request)) return new Response(null, { status: 405 });
+  if (resolved !== null && "redirect" in resolved) {
+    return new Response(null, { status: 307, headers: { Location: `${resolved.redirect}${search}` } });
   }
   const headers = headersFor(pathname);
-  const type = TYPES[extension(file.pathname)];
+  if (resolved === null) {
+    headers.set("Content-Type", TYPES[".html"]);
+    const body = request.method === "HEAD" ? null : readFileSync(new URL("404.html", REPO));
+    return new Response(body, { status: 404, headers });
+  }
+  const type = TYPES[extension(resolved.file)];
   if (!headers.has("Content-Type") && type) headers.set("Content-Type", type);
   if (!headers.has("Cache-Control")) headers.set("Cache-Control", DEFAULT_CACHE);
+  const file = new URL(`./${resolved.file}`, REPO);
   return new Response(request.method === "HEAD" ? null : readFileSync(file), { status: 200, headers });
+}
+
+const COMPRESSIBLE = /^(?:text\/|application\/(?:json|xml|javascript|[\w.+-]+\+json))/;
+
+// With "Accept-Encoding: gzip", a text response comes back gzip-encoded and
+// its Vary is left as it was (measured under wrangler dev: the page had
+// "Content-Encoding: gzip" and "Vary: Accept" only).
+async function encode(request: Request, response: Response): Promise<Response> {
+  const accepts = (request.headers.get("Accept-Encoding") ?? "").toLowerCase().includes("gzip");
+  const type = response.headers.get("Content-Type") ?? "";
+  if (!accepts || response.status !== 200 || response.body === null || response.headers.has("Content-Encoding") || !COMPRESSIBLE.test(type)) {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  headers.set("Content-Encoding", "gzip");
+  headers.delete("Content-Length");
+  return new Response(gzipSync(Buffer.from(await response.arrayBuffer())), { status: response.status, headers });
 }
 
 // The deployed site: the asset router in front of the Worker.
 //   - A path in run_worker_first runs the Worker, which reads files through
 //     env.ASSETS (here, assetFetch).
-//   - Otherwise a request for a file is answered by the asset router: a GET
-//     or HEAD with the file, any other method with 405 and no body, without
-//     running the Worker (measured under wrangler dev).
+//   - Otherwise a path with a file or a redirect is answered by the asset
+//     router without running the Worker, for every method (a 405 for any but
+//     GET and HEAD).
 //   - Otherwise a browser navigation gets the 404 page without the Worker
 //     (Static Assets, "Routing": Sec-Fetch-Mode navigate).
 //   - Anything else runs the Worker, as a request that matches no file does.
@@ -231,11 +240,10 @@ export async function site(request: Request, env: TestEnv = makeBaseEnv()): Prom
   const { pathname } = new URL(request.url);
   const deps = makeDeps();
   deps.setOrigin(assetFetch);
-  if (runsWorkerFirst(pathname)) return route(request, env, deps);
-  if (publishedFile(pathname) !== null || htmlRedirect(pathname) !== null) {
-    const isRead = request.method === "GET" || request.method === "HEAD";
-    return isRead ? assetFetch(request) : new Response(null, { status: 405 });
-  }
-  if (request.headers.get("Sec-Fetch-Mode") === "navigate") return assetFetch(request);
-  return route(request, env, deps);
+  let response: Response;
+  if (runsWorkerFirst(pathname)) response = await route(request, env, deps);
+  else if (resolve(pathname) !== null) response = await assetFetch(request);
+  else if (request.headers.get("Sec-Fetch-Mode") === "navigate") response = await assetFetch(request);
+  else response = await route(request, env, deps);
+  return encode(request, response);
 }

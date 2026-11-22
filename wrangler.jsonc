@@ -32,7 +32,8 @@
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
-    // The repository root is the site. .assetsignore lists what is not.
+    // The repository root is the site. .assetsignore is an allowlist of the
+    // files that are published; nothing else is uploaded.
     "directory": ".",
     // env.ASSETS.fetch(): how the Worker reads the two pages, their markdown
     // versions, and the 404 page.

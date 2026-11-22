@@ -1,14 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { assetsIgnore, PUBLISHED_FILES, publishedFolders } from "./support/published-files.ts";
 import {
   assetFetch,
-  CONSUMED_TOP_LEVEL,
-  PUBLIC_TOP_LEVEL,
+  existsExactly,
   headerRules,
   headersFor,
-  ignoreRules,
-  isIgnored,
+  isPublished,
   publishedFile,
   publishedPaths,
   ruleMatches,
@@ -21,35 +20,49 @@ const SITE = "https://burrowsapps.com";
 const get = (path: string, init?: RequestInit): Promise<Response> => site(new Request(`${SITE}${path}`, init));
 const NOT_FOUND_PAGE = readFileSync(new URL("404.html", REPO), "utf8");
 
-test("every top-level entry is published, consumed by wrangler, or in .assetsignore", async () => {
-  const unclassified = readdirSync(REPO).filter(
-    (entry) => !PUBLIC_TOP_LEVEL.includes(entry) && !CONSUMED_TOP_LEVEL.includes(entry) && !isIgnored(entry),
-  );
-  assert.deepEqual(unclassified, [], `add to PUBLIC_TOP_LEVEL or .assetsignore: ${unclassified.join(", ")}`);
+const TO_PUBLISH = "to publish a file, add it to PUBLISHED_FILES in tests/support/published-files.ts and run node tests/support/write-assetsignore.ts";
+
+test(".assetsignore is exactly the allowlist generated from PUBLISHED_FILES", async () => {
+  assert.equal(readFileSync(new URL(".assetsignore", REPO), "utf8"), assetsIgnore(), `.assetsignore is out of date: ${TO_PUBLISH}`);
 });
 
-test("no published top-level entry is also ignored", async () => {
-  for (const entry of [...PUBLIC_TOP_LEVEL, ...CONSUMED_TOP_LEVEL]) assert.ok(!isIgnored(entry), `${entry} is ignored`);
+test(".assetsignore ignores everything, then re-includes folders, then files", async () => {
+  const rules = assetsIgnore().split("\n").filter((line) => line !== "" && !line.startsWith("#"));
+  assert.equal(rules[0], "*");
+  const firstFile = rules.findIndex((rule) => rule.startsWith("!/"));
+  for (const rule of rules.slice(1, firstFile)) assert.match(rule, /^![^/!*][^!*]*\/$/, `not a folder rule: ${rule}`);
+  for (const rule of rules.slice(firstFile)) assert.match(rule, /^!\/[^!*]+[^/]$/, `not a file rule: ${rule}`);
+  assert.equal(rules.length, 1 + publishedFolders().length + PUBLISHED_FILES.length);
 });
 
-test("every .assetsignore rule is a bare name or **/name", async () => {
-  const rules = ignoreRules();
-  assert.ok(rules.length > 0);
-  for (const rule of rules) {
-    const name = rule.startsWith("**/") ? rule.slice(3) : rule;
-    assert.match(name, /^[^/!*?[\]\\\s]+$/, `unsupported rule: ${rule}`);
+test("every published file exists with exactly that name", async () => {
+  assert.equal(new Set(PUBLISHED_FILES).size, PUBLISHED_FILES.length, "a file is listed twice");
+  for (const file of PUBLISHED_FILES) assert.ok(existsExactly(file), `${file} is listed but does not exist`);
+});
+
+test("every file in a published folder is on the list, so none is forgotten", async () => {
+  const walk = (folder: string): string[] =>
+    readdirSync(new URL(`./${folder}`, REPO), { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory() ? walk(`${folder}${entry.name}/`) : [`${folder}${entry.name}`]);
+  const unlisted = publishedFolders()
+    .filter((folder) => !folder.includes("/"))
+    .flatMap((folder) => walk(`${folder}/`))
+    .filter((file) => !file.endsWith("/.DS_Store") && !isPublished(file));
+  assert.deepEqual(unlisted, [], `not published: ${unlisted.join(", ")}; ${TO_PUBLISH}, or remove the file`);
+});
+
+test("the list names no repository file, local state, or wrangler input", async () => {
+  for (const file of PUBLISHED_FILES) {
+    const top = file.split("/")[0];
+    assert.ok(!["tests", "workers", ".github", ".team", ".git", ".wrangler", "node_modules"].includes(top), file);
+    assert.ok(!["README.md", "LICENSE", "CNAME", ".nojekyll", "wrangler.jsonc", "_headers", ".assetsignore", ".gitignore"].includes(file), file);
+    assert.ok(!top.startsWith(".") || top === ".well-known", file);
   }
 });
 
-test("local state, source, and repository documents are not published", async () => {
-  for (const path of [".team", ".git", ".wrangler", "node_modules", "tests", "workers", "wrangler.jsonc", "README.md", "CNAME", "static/img/.DS_Store", ".team/STATUS.md", "workers/contact/index.js"]) {
-    assert.ok(isIgnored(path), `${path} would be published`);
-  }
-});
-
-test("site files are published", async () => {
-  for (const path of [".well-known/security.txt", "static/js/home.js", "index.html", "robots.txt"]) {
-    assert.ok(!isIgnored(path), `${path} is ignored`);
+test("secrets, backups, and local state are not published", async () => {
+  for (const path of [".env", ".dev.vars", "static/notes.bak", "static/img/.DS_Store", ".team/STATUS.md", "README.md", "CNAME", "_headers", "tests/robots.test.ts", "workers/contact/index.js"]) {
+    assert.ok(!isPublished(path), `${path} would be published`);
   }
 });
 
@@ -124,7 +137,7 @@ test("styles get an hour of cache and images a month", async () => {
 });
 
 test("repository files that are not part of the site answer with the 404 page", async () => {
-  for (const path of ["/README.md", "/tests/robots.test.ts", "/workers/contact/index.js", "/wrangler.jsonc", "/.team/STATUS.md", "/CNAME", "/_headers", "/.assetsignore", "/.gitignore", "/.github/workflows/build.yml", "/workers/agent-readiness/facts.ts", "/LICENSE"]) {
+  for (const path of ["/README.md", "/tests/robots.test.ts", "/workers/contact/index.js", "/wrangler.jsonc", "/.team/STATUS.md", "/CNAME", "/_headers", "/.assetsignore", "/.gitignore", "/.github/workflows/build.yml", "/workers/agent-readiness/facts.ts", "/LICENSE", "/.env", "/.dev.vars", "/static/notes.bak"]) {
     const response = await get(path);
     assert.equal(response.status, 404, path);
     assert.equal(await response.text(), NOT_FOUND_PAGE, path);
@@ -156,37 +169,3 @@ test("files are typed by extension as Cloudflare infers it", async () => {
   assert.equal((await get("/sitemap.xml")).headers.get("Content-Type"), "application/xml");
 });
 
-// Everything in a published folder is public, and the classification test
-// above reads only the top level. This list is what a deploy uploads: a new
-// file in static/, .well-known/, or mcp/ (a backup, a note, a test) fails
-// here until someone decides it is part of the site.
-const PUBLISHED_FILES = [
-  ".well-known/agent-skills/contact-burrows-applications/SKILL.md",
-  ".well-known/agent-skills/index.json",
-  ".well-known/ai-catalog.json",
-  ".well-known/api-catalog",
-  ".well-known/ard.json",
-  ".well-known/mcp/server-card.json",
-  ".well-known/oauth-authorization-server",
-  ".well-known/oauth-protected-resource",
-  ".well-known/security.txt",
-  "404.html",
-  "auth.md",
-  "developers.md",
-  "favicon.ico",
-  "index.html",
-  "index.md",
-  "mcp/server-card",
-  "privacy.html",
-  "privacy.md",
-  "robots.txt",
-  "sitemap.xml",
-  "static/css/home.css",
-  "static/img/apple-touch-icon.png",
-  "static/img/og.jpg",
-  "static/js/home.js",
-];
-
-test("the published files are exactly the site's files", async () => {
-  assert.deepEqual(publishedPaths(), PUBLISHED_FILES, "a file in a published folder is public: list it here or add it to .assetsignore");
-});
