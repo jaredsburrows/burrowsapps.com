@@ -14,6 +14,30 @@
         "digest"
       ],
       "automerge": true
+    },
+    {
+      "description": "The deploy action and wrangler run with the Cloudflare token: review every update, and wait for it to age.",
+      "matchPackageNames": [
+        "cloudflare/wrangler-action",
+        "wrangler"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "14 days"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The wrangler version pinned twice in the workflow: the dry run and the deploy action.",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/build\\.yml$/"
+      ],
+      "matchStrings": [
+        "npx --yes wrangler@(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "wranglerVersion: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
+      ],
+      "depNameTemplate": "wrangler",
+      "datasourceTemplate": "npm"
     }
   ]
 }

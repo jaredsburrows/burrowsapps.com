@@ -51,9 +51,9 @@ test("the workflow never runs with secrets for a pull request from a fork", asyn
 
 test("the checks job ends with a credential-free dry run", async () => {
   const checks = job("checks");
-  assert.ok(checks.includes("wrangler deploy --dry-run"));
+  assert.match(checks, /run: npx --yes wrangler@\d+\.\d+\.\d+ deploy --dry-run$/m);
   assert.ok(!checks.includes("secrets."));
-  assert.ok(checks.indexOf("wrangler deploy --dry-run") > checks.indexOf("node --test"), "the dry run must come after the tests");
+  assert.ok(checks.indexOf("deploy --dry-run") > checks.indexOf("node --test"), "the dry run must come after the tests");
 });
 
 // Everything before the first job: triggers, permissions, concurrency, env.
@@ -84,4 +84,15 @@ test("the deploy job has one third-party action, and no checkout keeps credentia
   const checkouts = WORKFLOW.split("uses: actions/checkout@").slice(1);
   assert.equal(checkouts.length, 2);
   for (const checkout of checkouts) assert.match(checkout.split("\n\n")[0], /persist-credentials: false/);
+});
+
+// Both jobs run one exact wrangler, so a new release changes nothing until a
+// reviewed commit moves both pins together.
+test("the dry run and the deploy use the same exact wrangler version", async () => {
+  const dryRun = job("checks").match(/npx --yes wrangler@(\d+\.\d+\.\d+) deploy --dry-run/)?.[1];
+  const deploy = job("deploy").match(/^ {10}wranglerVersion: "(\d+\.\d+\.\d+)"$/m)?.[1];
+  assert.ok(dryRun, "the dry run does not pin wrangler");
+  assert.ok(deploy, "the deploy action does not pin wrangler");
+  assert.equal(dryRun, deploy);
+  assert.equal(WORKFLOW.split("wrangler@").length - 1, 1, "wrangler is run somewhere else too");
 });
