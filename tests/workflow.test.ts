@@ -50,3 +50,33 @@ test("the checks job ends with a credential-free dry run", async () => {
   assert.ok(!checks.includes("secrets."));
   assert.ok(checks.indexOf("wrangler deploy --dry-run") > checks.indexOf("node --test"), "the dry run must come after the tests");
 });
+
+// Everything before the first job: triggers, permissions, concurrency, env.
+const HEADER = WORKFLOW.slice(0, WORKFLOW.indexOf("\njobs:"));
+
+test("no secret is read at workflow level, where every job would receive it", async () => {
+  assert.ok(!HEADER.includes("secrets."), "a workflow-level secret reaches the checks job and the dry run");
+  assert.ok(!/^env:\n(?: {2}.*\n)*? {2}\S+: .*secrets/m.test(HEADER));
+});
+
+test("the workflow permissions are read-only, and no job widens them", async () => {
+  assert.match(HEADER, /^permissions:\n {2}contents: read$/m);
+  assert.ok(!/^ {4}permissions:/m.test(job("checks")), "the checks job sets its own permissions");
+  assert.ok(!/^ {4}permissions:/m.test(job("deploy")), "the deploy job sets its own permissions");
+});
+
+test("deploys queue and a running upload is never canceled", async () => {
+  const concurrency = job("deploy").match(/^ {4}concurrency:\n {6}group: (.+)\n {6}cancel-in-progress: (.+)$/m);
+  assert.ok(concurrency, "the deploy job has no concurrency block");
+  assert.equal(concurrency[1], "cloudflare-deploy");
+  assert.equal(concurrency[2], "false");
+  assert.ok(!/^ {4}concurrency:/m.test(job("checks")), "only the deploy job shares a group");
+});
+
+test("the deploy job has one third-party action, and no checkout keeps credentials", async () => {
+  const uses = [...job("deploy").matchAll(/uses: (\S+)/g)].map(([, action]) => action.split("@")[0]);
+  assert.deepEqual(uses.sort(), ["actions/checkout", "cloudflare/wrangler-action"]);
+  const checkouts = WORKFLOW.split("uses: actions/checkout@").slice(1);
+  assert.equal(checkouts.length, 2);
+  for (const checkout of checkouts) assert.match(checkout.split("\n\n")[0], /persist-credentials: false/);
+});
