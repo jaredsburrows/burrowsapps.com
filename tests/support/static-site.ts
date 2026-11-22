@@ -115,3 +115,39 @@ export function runsWorkerFirst(pathname: string): boolean {
     pattern.endsWith("*") ? pathname.startsWith(pattern.slice(0, -1)) : pathname === pattern,
   );
 }
+
+export type HeaderRule = { pattern: string; headers: [string, string][] };
+
+// The rules in _headers, in file order: a line that starts with "/" opens a
+// rule, and the indented "Name: value" lines under it are its headers.
+export function headerRules(): HeaderRule[] {
+  const rules: HeaderRule[] = [];
+  for (const line of readFileSync(new URL("_headers", REPO), "utf8").split("\n")) {
+    if (line.trim() === "" || line.trim().startsWith("#")) continue;
+    if (!/^\s/.test(line)) {
+      rules.push({ pattern: line.trim(), headers: [] });
+      continue;
+    }
+    const current = rules.at(-1);
+    const colon = line.indexOf(":");
+    if (!current || colon < 0) throw new Error(`_headers: unexpected line ${JSON.stringify(line)}`);
+    current.headers.push([line.slice(0, colon).trim(), line.slice(colon + 1).trim()]);
+  }
+  return rules;
+}
+
+// A pattern matches a path exactly, or as a prefix when it ends in "*".
+export const ruleMatches = (pattern: string, pathname: string): boolean =>
+  pattern.endsWith("*") ? pathname.startsWith(pattern.slice(0, -1)) : pathname === pattern;
+
+// The headers _headers adds to a file at this path. Every matching rule
+// applies, and a header named by two of them is joined with ", " (Static
+// Assets, "Headers").
+export function headersFor(pathname: string): Headers {
+  const headers = new Headers();
+  for (const rule of headerRules()) {
+    if (!ruleMatches(rule.pattern, pathname)) continue;
+    for (const [name, value] of rule.headers) headers.append(name, value);
+  }
+  return headers;
+}
