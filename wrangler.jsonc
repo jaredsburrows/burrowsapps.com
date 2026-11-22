@@ -1,0 +1,61 @@
+{
+  // Schema is fetched over the network: there is no package manifest at the
+  // root and no install step, so there is no local wrangler to point at.
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  // burrowsapps.com: a static site plus a small Worker. Cloudflare serves the
+  // files in this directory from its edge. The Worker in
+  // workers/agent-readiness runs only for the paths in assets.run_worker_first
+  // and for requests that match no file. Every other request is answered by
+  // the asset router without running any code, and is not counted as a Worker
+  // request.
+  //
+  // Deployed by .github/workflows/build.yml on every push to gh-pages.
+  // Preview with production routing, headers, and the 404 page:
+  //   npx wrangler dev
+  //
+  // There is deliberately no "routes" key. The Worker is attached to
+  // burrowsapps.com/* in the Cloudflare dashboard (Workers Routes), and a
+  // deploy from here leaves that alone. That is what lets the deploy token
+  // carry a single permission, and it means no commit can detach the site
+  // from its domain. Adding "routes" here would make every deploy rewrite
+  // them and would need a token that may edit the zone's routes.
+  "name": "burrowsapps-com",
+  // Same account as workers/contact: it owns the burrowsapps.com zone.
+  "account_id": "23fd1f78e6c723b48b52bd073092907a",
+  "main": "workers/agent-readiness/index.ts",
+  // Same date as workers/contact. Keep it at 2025-04-01 or later: from that
+  // date a browser navigation to a path with no file gets the 404 page from
+  // the asset router without invoking the Worker.
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true },
+  // The site answers only on burrowsapps.com: no workers.dev copy of it.
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    // The repository root is the site. .assetsignore is an allowlist of the
+    // files that are published; nothing else is uploaded.
+    "directory": ".",
+    // env.ASSETS.fetch(): how the Worker reads the two pages, their markdown
+    // versions, and the 404 page.
+    "binding": "ASSETS",
+    // The default, written out because handler.ts depends on it: asked for
+    // "/privacy.html" as a plain file, the asset router answers with a 307 to
+    // "/privacy". The Worker runs first on that path and reads "/privacy".
+    "html_handling": "auto-trailing-slash",
+    // A path with no file gets 404.html with status 404.
+    "not_found_handling": "404-page",
+    // The paths that need code. The query string is not part of the match, so
+    // "/?sent=1" and "/?utm_source=x" run the Worker like "/".
+    //   /, /privacy.html   Link headers, and markdown for Accept: text/markdown
+    //   /mcp               the MCP server; "/mcp/server-card" is a file
+    //   /api/v1 ...        the JSON API: rate limited, and /status needs a clock
+    // Every request that matches a pattern here is a Worker request. Do not
+    // add a pattern that matches a static file.
+    "run_worker_first": ["/", "/privacy.html", "/mcp", "/api/v1", "/api/v1/*"]
+  },
+  // Per Cloudflare location and approximate, like the contact Worker's limits.
+  //   PUBLIC_LIMITER   60/min per IP: /api/v1 and POST /mcp
+  "ratelimits": [
+    { "name": "PUBLIC_LIMITER", "namespace_id": "2001", "simple": { "limit": 60, "period": 60 } }
+  ]
+}

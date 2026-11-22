@@ -1,15 +1,17 @@
 // Decides, for each request, whether the Worker answers it itself (an "owned"
-// path), decorates the origin's page, or passes it through untouched.
+// path), decorates one of the two pages, or hands it to the asset router.
 //
-// Owned paths never fall through to the origin: an internal failure is a 500
-// from here, and passThroughOnException is not armed for them, so a request
-// meant for the Worker is never answered by GitHub Pages instead. Everything
-// else keeps the iteration 1 fail-open behavior.
+// The Worker is invoked only for the paths in assets.run_worker_first in
+// wrangler.jsonc and for requests that match no static file; the asset router
+// answers every other request without running this code.
+//
+// Owned paths never fall through to the static files: an internal failure is
+// a 500 from here, and passThroughOnException is not armed for them. For
+// everything else, failing open means serving the plain file.
 
-import { handle as api, catalog } from "./api.ts";
-import { handle } from "./handler.ts";
-import { card, endpoint as mcp } from "./mcp.ts";
-import { oauthDocument } from "./wellknown.ts";
+import { handle as api } from "./api.ts";
+import { assetRequest, handle } from "./handler.ts";
+import { CARD_PATH, endpoint as mcp } from "./mcp.ts";
 import { json } from "./http.ts";
 import type { Deps, Env } from "./http.ts";
 
@@ -22,7 +24,6 @@ const notFound = async (): Promise<Response> => json(404, { error: "not_found" }
 const publicApi: Handler = (request, env, deps, url) => api(request, env, deps, url);
 
 const ROUTES: Readonly<Record<string, Handler>> = {
-  "/.well-known/api-catalog": async (request) => catalog(request),
   "/api/v1": publicApi,
   "/api/v1/": publicApi,
   "/api/v1/company": publicApi,
@@ -30,16 +31,17 @@ const ROUTES: Readonly<Record<string, Handler>> = {
   "/api/v1/status": publicApi,
   "/api/v1/openapi.json": publicApi,
   "/mcp": (request, env) => mcp(request, env),
-  "/mcp/server-card": async (request, _env, _deps, url) => card(request, url),
-  "/.well-known/mcp/server-card.json": async (request, _env, _deps, url) => card(request, url),
-  "/.well-known/oauth-authorization-server": async (request, _env, _deps, url) => oauthDocument(request, url),
-  "/.well-known/oauth-protected-resource": async (request, _env, _deps, url) => oauthDocument(request, url),
 };
 
 export const OWNED_EXACT: readonly string[] = Object.keys(ROUTES);
 export const OWNED_PREFIXES: readonly string[] = ["/api/v1/", "/mcp/"];
 
+// Static files that live under an owned prefix. The asset router serves
+// them; if a request for one reaches the Worker it is handed back.
+export const STATIC_UNDER_OWNED: readonly string[] = [CARD_PATH];
+
 export function isOwned(pathname: string): boolean {
+  if (STATIC_UNDER_OWNED.includes(pathname)) return false;
   return OWNED_EXACT.includes(pathname) || OWNED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
@@ -93,9 +95,10 @@ export async function route(request: Request, env: Env, deps: Deps): Promise<Res
   try {
     response = await handle(request, deps.originFetch);
   } catch (error) {
-    // Fail open: serve whatever GitHub Pages serves, undecorated.
+    // Fail open: serve the plain file, undecorated, from the path the asset
+    // router serves it at ("/privacy", not the redirect at "/privacy.html").
     console.error("agent-readiness failed open:", String(error));
-    response = await deps.originFetch(request);
+    response = await deps.originFetch(assetRequest(request));
   }
   try {
     logProbe(request, url, response, deps);

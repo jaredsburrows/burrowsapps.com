@@ -97,7 +97,8 @@ export function openapi(): Record<string, unknown> {
   };
 }
 
-// RFC 9727 API catalog in the RFC 9264 linkset format.
+// RFC 9727 API catalog in the RFC 9264 linkset format, published as the
+// static file .well-known/api-catalog (see documents.ts).
 // The first entry is the catalog itself, listing each API as an item.
 export const CATALOG: Record<string, unknown> = {
   linkset: [
@@ -121,10 +122,6 @@ export const CATALOG: Record<string, unknown> = {
     },
   ],
 };
-
-export function catalog(request: Request): Response {
-  return staticDoc(request, JSON.stringify(CATALOG), CATALOG_TYPE, { Link: '</.well-known/api-catalog>; rel="api-catalog"' });
-}
 
 type Body = { body: unknown; contentType?: string; headers?: Record<string, string> };
 

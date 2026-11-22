@@ -2,8 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
-import { route } from "./router.ts";
-import { makeBaseEnv, makeDeps } from "./testing.ts";
+import { site } from "../../tests/support/static-site.ts";
 import { AUTHORIZATION_SERVER, OAUTH_PATHS, PROTECTED_RESOURCE } from "./wellknown.ts";
 
 const SITE = "https://burrowsapps.com";
@@ -22,10 +21,8 @@ const strings = (value: unknown): string[] => {
   return [];
 };
 
-const fetchDoc = (path: string, init: RequestInit = {}) => {
-  const deps = makeDeps();
-  return route(new Request(`${SITE}${path}`, init), makeBaseEnv(), deps).then((response) => ({ response, deps }));
-};
+// The documents are static files: fetched from the emulated site.
+const fetchDoc = async (path: string, init: RequestInit = {}) => ({ response: await site(new Request(`${SITE}${path}`, init)) });
 
 test("both documents say, at every level, that nothing here is offered", async () => {
   const levels: [string, Labeled | undefined][] = [
@@ -100,7 +97,7 @@ test("every endpoint field points at the page that explains there is no login", 
   }
 });
 
-test("the MCP and catalog URLs are the real ones the Worker serves", async () => {
+test("the MCP and catalog URLs are the real ones the site serves", async () => {
   for (const doc of [AS, PR]) {
     assert.equal(doc.mcp_url, `${SITE}/mcp`);
     for (const field of ["mcp_server_card_url", "api_catalog_url"]) {
@@ -111,23 +108,20 @@ test("the MCP and catalog URLs are the real ones the Worker serves", async () =>
 });
 
 for (const path of OAUTH_PATHS) {
-  test(`${path} is served by the Worker as application/json`, async () => {
-    const { response, deps } = await fetchDoc(path);
+  test(`${path} is served as application/json`, async () => {
+    const { response } = await fetchDoc(path);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Content-Type"), "application/json");
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(response.headers.get("Cache-Control"), "public, max-age=3600");
     assert.deepEqual(await response.json(), path.endsWith("authorization-server") ? AS : PR);
-    assert.equal(deps.originCalls.length, 0);
-    assert.equal(deps.passThroughCalls, 0);
   });
 
-  test(`${path} answers HEAD with no body and refuses POST`, async () => {
+  test(`${path} answers HEAD with no body`, async () => {
     const head = (await fetchDoc(path, { method: "HEAD" })).response;
     assert.equal(head.status, 200);
     assert.equal(head.headers.get("Content-Type"), "application/json");
     assert.equal(await head.text(), "");
-    assert.equal((await fetchDoc(path, { method: "POST" })).response.status, 405);
   });
 }
 

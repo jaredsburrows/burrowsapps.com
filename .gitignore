@@ -250,6 +250,7 @@ hs_err_pid*
 
 ### Cloudflare Wrangler ###
 
-# Local dev state from `wrangler dev --config workers/contact/wrangler.jsonc`.
-# Must stay untracked: this branch is served verbatim by GitHub Pages.
+# Local dev state from `wrangler dev`.
+# Must stay untracked. It is not on the .assetsignore allowlist, so it is
+# never uploaded either.
 .wrangler/

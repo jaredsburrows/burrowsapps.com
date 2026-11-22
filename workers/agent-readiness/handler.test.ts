@@ -150,7 +150,7 @@ test("handle: markdown on www is fetched from www", async () => {
 
 test("handle: /privacy.html serves /privacy.md and links only its alternate", async () => {
   const origin = stubOrigin({
-    "https://burrowsapps.com/privacy.html": htmlPage(),
+    "https://burrowsapps.com/privacy": htmlPage(),
     "https://burrowsapps.com/privacy.md": markdownFile(),
   });
   const markdown = await handle(get("https://burrowsapps.com/privacy.html", "text/markdown"), origin.fetch);
@@ -160,9 +160,27 @@ test("handle: /privacy.html serves /privacy.md and links only its alternate", as
   assert.equal(PRIVACY_LINKS, '</privacy.md>; rel="alternate"; type="text/markdown"');
 
   const html = await handle(get("https://burrowsapps.com/privacy.html"), origin.fetch);
-  assert.equal(origin.calls[1].url, "https://burrowsapps.com/privacy.html");
+  assert.equal(origin.calls[1].url, "https://burrowsapps.com/privacy");
+  assert.equal(origin.calls[1].method, "GET");
+  assert.equal(origin.calls[1].headers.get("Accept"), BROWSER_ACCEPT);
   await assertDecoratedHtml(html, PRIVACY_LINKS);
   assert.equal(origin.calls.length, 2);
+});
+
+test("handle: a conditional HEAD for /privacy.html asks for /privacy with the same method and headers", async () => {
+  const origin = stubOrigin({ "https://burrowsapps.com/privacy": htmlPage(304, { ETag: '"abc"' }) });
+  const request = new Request("https://burrowsapps.com/privacy.html", {
+    method: "HEAD",
+    headers: { Accept: BROWSER_ACCEPT, "If-None-Match": '"abc"' },
+  });
+  const response = await handle(request, origin.fetch);
+  assert.equal(origin.calls.length, 1);
+  assert.equal(origin.calls[0].url, "https://burrowsapps.com/privacy");
+  assert.equal(origin.calls[0].method, "HEAD");
+  assert.equal(origin.calls[0].headers.get("If-None-Match"), '"abc"');
+  assert.equal(origin.calls[0].headers.get("Accept"), BROWSER_ACCEPT);
+  assert.equal(response.status, 304);
+  assert.equal(response.headers.get("Link"), PRIVACY_LINKS);
 });
 
 test("handle: HEAD with Accept text/markdown returns markdown headers and no body", async () => {

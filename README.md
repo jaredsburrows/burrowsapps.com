@@ -6,7 +6,7 @@ Burrows Applications website
 [![Build](https://github.com/jaredsburrows/burrowsapps.com/workflows/build/badge.svg)](https://github.com/jaredsburrows/burrowsapps.com/actions)
 [![Twitter Follow](https://img.shields.io/twitter/follow/jaredsburrows.svg?style=social)](https://twitter.com/jaredsburrows)
 
-Business website — fully static, no build step. GitHub Pages serves the repo as-is (`.nojekyll`).
+Business website: static files plus a small Worker, served by Cloudflare as the Worker `burrowsapps-com`. No build step. CI deploys it on every push to `gh-pages`.
 
 ### Preview the website
 
@@ -14,6 +14,12 @@ Open `index.html` in a browser, or serve the directory:
 
 ```
 python3 -m http.server
+```
+
+For a preview with production routing, `_headers`, and the 404 page:
+
+```
+npx wrangler dev
 ```
 
 ### Agent readiness
@@ -24,20 +30,22 @@ Files and endpoints that tell AI agents and crawlers what this site is and how t
 
 | Path | Purpose | Served by | Spec |
 |---|---|---|---|
-| `/robots.txt` | Crawl policy, with explicit groups for AI crawlers and a `Content-Signal` line in every group | Pages | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309), [Content Signals](https://contentsignals.org/) |
-| `/index.md`, `/privacy.md` | Markdown versions of `/` and `/privacy.html`; also served from those URLs to `Accept: text/markdown` | Pages, negotiated by the Worker | [Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) |
-| `/.well-known/agent-skills/index.json` and the skill it lists | What Burrows Applications builds and how to get in touch | Pages | [Agent Skills Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc) |
-| `/.well-known/ai-catalog.json`, `/.well-known/ard.json` | ARD manifest: the skill, the MCP server, and the public API. Identical bytes at both paths | Pages | [ARD](https://github.com/ards-project/ard-spec) |
-| `/developers.md` | Documentation for the API and the MCP server | Pages | |
+| `/robots.txt` | Crawl policy, with explicit groups for AI crawlers and a `Content-Signal` line in every group | File | [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309), [Content Signals](https://contentsignals.org/) |
+| `/index.md`, `/privacy.md` | Markdown versions of `/` and `/privacy.html`; also served from those URLs to `Accept: text/markdown` | File, negotiated by the Worker | [Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/) |
+| `/.well-known/agent-skills/index.json` and the skill it lists | What Burrows Applications builds and how to get in touch | File | [Agent Skills Discovery v0.2.0](https://github.com/cloudflare/agent-skills-discovery-rfc) |
+| `/.well-known/ai-catalog.json`, `/.well-known/ard.json` | ARD manifest: the skill, the MCP server, and the public API. Identical bytes at both paths | File | [ARD](https://github.com/ards-project/ard-spec) |
+| `/developers.md` | Documentation for the API and the MCP server | File | |
 | `/api/v1`, `/api/v1/company`, `/api/v1/services`, `/api/v1/status` | Read-only JSON API with the company facts from `workers/agent-readiness/facts.ts` | Worker | |
 | `/api/v1/openapi.json` | OpenAPI 3.1 description of that API | Worker | [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) |
-| `/.well-known/api-catalog` | API catalog listing the API and the MCP server | Worker | [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) |
+| `/.well-known/api-catalog` | API catalog listing the API and the MCP server | File, generated | [RFC 9727](https://www.rfc-editor.org/rfc/rfc9727) |
 | `/mcp` | Stateless, read-only MCP server with three tools (2026-07-28, plus the `initialize` handshake for 2025-06-18 and 2025-11-25 clients) | Worker | [MCP](https://modelcontextprotocol.io/) |
-| `/mcp/server-card`, `/.well-known/mcp/server-card.json` | MCP server card, one document at both paths | Worker | SEP-2127 |
-| `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` | OAuth metadata that says `"status": "not_offered"`: no authorization server runs here | Worker | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) |
-| `/auth.md` | Says that no authentication is required, offered, or possible, and that `/api/contact` is meant only for the contact form | Pages | [auth.md](https://workos.com/auth-md/docs/auth-md) |
-| `static/js/home.js` | Registers the contact form as the WebMCP tool `send_contact_message` in browsers that support it | Pages | [WebMCP](https://webmachinelearning.github.io/webmcp/) |
+| `/mcp/server-card`, `/.well-known/mcp/server-card.json` | MCP server card, one document at both paths | File, generated | SEP-2127 |
+| `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` | OAuth metadata that says `"status": "not_offered"`: no authorization server runs here | File, generated | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) |
+| `/auth.md` | Says that no authentication is required, offered, or possible, and that `/api/contact` is meant only for the contact form | File | [auth.md](https://workos.com/auth-md/docs/auth-md) |
+| `static/js/home.js` | Registers the contact form as the WebMCP tool `send_contact_message` in browsers that support it | File | [WebMCP](https://webmachinelearning.github.io/webmcp/) |
 | `_index._agents.burrowsapps.com` | DNS-AID record (see below) | DNS | DNS-AID draft |
+
+"Generated" files are written from constants in the Worker source by `workers/agent-readiness/tools/write-documents.ts` and committed.
 
 #### Keeping things in sync
 
@@ -45,7 +53,9 @@ The tests fail when any of these drift:
 
 - Edit `index.html` or `privacy.html`: make the same edit in `index.md` or `privacy.md`.
 - Edit the company facts in `workers/agent-readiness/facts.ts`: they must still appear in `index.md` or `SKILL.md`, and the form limits must equal the ones in `workers/contact/index.js`.
-- Change `PUBLIC_LIMITER` in `wrangler.jsonc`: change the figure in `developers.md` too.
+- Change `PUBLIC_LIMITER` in the root `wrangler.jsonc`: change the figure in `developers.md` too.
+- Edit `CATALOG`, `CARD`, or the OAuth documents: run `node workers/agent-readiness/tools/write-documents.ts` and commit the result.
+- Publish a new file: add it to `PUBLISHED_FILES` in `tests/support/published-files.ts`, run `node tests/support/write-assetsignore.ts`, and commit both. Nothing else is uploaded.
 - Edit `SKILL.md`: recompute its digest and put it in `index.json` as `sha256:<hash>`:
 
   ```
@@ -63,38 +73,48 @@ Node 24 or later, no install step:
 node --test "tests/*.test.ts" "workers/agent-readiness/*.test.ts"
 ```
 
-#### The edge Worker
+#### How it is served
 
-GitHub Pages cannot set response headers, negotiate content, or run code, so `workers/agent-readiness` sits in front of it on two routes:
+`wrangler.jsonc` at the repository root deploys this directory as static assets with the Worker in `workers/agent-readiness`. Cloudflare's asset router answers first. The Worker runs only for the paths in `assets.run_worker_first` and for requests that match no file:
 
-- `burrowsapps.com/*`, a wildcard, because a route matches a query string only if it ends in `*`. This is what lets `/?utm_source=x` get the `Link` header and markdown.
-- `burrowsapps.com/api/v1*`, because an old dashboard route `burrowsapps.com/api/*` may still point at the contact Worker, and the most specific pattern wins. The contact Worker keeps `/api/contact*`, which is longer than both.
+- `/` and `/privacy.html`: the Worker adds `Link` headers and answers `Accept: text/markdown` with the markdown file (`Cache-Control: private, no-store`, `Vary: Accept`); browsers still get HTML. The query string is not part of the match, so `/?utm_source=x` runs the Worker too. The Worker reads the pages through the `ASSETS` binding: `/` and `/privacy`, where the asset router serves `index.html` and `privacy.html`.
+- `/mcp`: the MCP server.
+- `/api/v1` and `/api/v1/*` (which covers `/api/v1/`): the JSON API, rate limited by `PUBLIC_LIMITER`, with a clock in `/status`.
 
-`www.burrowsapps.com` is not routed: it redirects to the apex at the origin.
+The paths the Worker answers itself never fall through to a file; an internal error there is a JSON `500`. If decorating a page fails, the visitor gets the plain file.
 
-For `/` and `/privacy.html` the Worker adds `Link` headers and answers `Accept: text/markdown` with the markdown file (`Cache-Control: private, no-store`, `Vary: Accept`); browsers still get HTML. The paths in the table above marked "Worker" are answered by the Worker itself and never reach Pages; an internal error there is a JSON `500`. Every other path is passed to Pages untouched and fails open: on any error the visitor gets the Pages response.
+Every other path is a file and costs no Worker request. A path with no file gets `404.html` with status `404`. `/index.html` and `/404.html` redirect to `/` and `/404`.
 
-Deploy by hand after the change is merged:
+- `_headers` sets CORS and `nosniff` on every file, cache lifetimes for `static/` and the favicon, the markdown content type, and the type, cache, and `Link` headers of the generated documents. Responses the Worker builds itself (the API, the MCP server, the markdown variants) set their own headers in code; the two HTML pages, read through the binding, keep the headers `_headers` gives their files. `/` must never be given a cache lifetime: it has two representations, and a test fails if a rule for it is added.
+- `.assetsignore` is an allowlist generated from `PUBLISHED_FILES` in `tests/support/published-files.ts`: it ignores everything, then re-includes each published folder and file. `wrangler deploy` uploads the working tree, not only committed files, so a denylist would publish any stray file (a `.env`, a `.dev.vars`, a backup). A test fails when `.assetsignore` differs from the list, when a listed file is missing, or when a file in a published folder is not listed.
+
+Workers Free allows 100,000 Worker requests a day per account, shared with the contact Worker. Files do not count. Over the limit, files are still served, and `/`, `/privacy.html`, `/mcp`, and `/api/v1` answer `429` until the daily reset.
+
+Until GitHub Pages is switched off, an uncaught error in the Worker falls back to it.
+
+#### Deploy
+
+CI deploys: `.github/workflows/build.yml` runs the checks, and on a push to `gh-pages` the "Deploy to Cloudflare" job runs `wrangler deploy` with the repository secret `CLOUDFLARE_API_TOKEN`. The token is a Cloudflare user API token with exactly one permission, Account > Workers Scripts > Edit. Cloudflare cannot scope it to one Worker: it can replace or delete every Worker in the account, the contact Worker included. Give it an expiry (a year at most) and rotate it before then; never widen it. Pull requests run only the checks, ending with a credential-free `wrangler deploy --dry-run`.
+
+To deploy again without a new commit, run the workflow from the Actions tab on `gh-pages`.
+
+To roll back, list the versions and roll back to one, then revert the commit so the next push does not deploy it again:
 
 ```
-npx wrangler deploy --config workers/agent-readiness/wrangler.jsonc
+npx wrangler deployments list
+npx wrangler rollback <version-id>
 ```
 
-After each deploy, open both routes in the Cloudflare dashboard and set "Request limit failure mode" to "Fail open". Wrangler has no setting for it. If the four old exact routes (`burrowsapps.com/`, `www.burrowsapps.com/`, and the two `/privacy.html` ones) are still listed, delete them.
+#### Cloudflare settings outside this repository
 
-Every request to the apex now runs the Worker, including assets, and it counts against the account's 100,000 requests a day on Workers Free. That limit is per account and shared with the contact Worker. When it is used up, the contact form stops working until the daily reset, and the API, the MCP server, the OAuth documents, and the markdown variant are unavailable; with both routes set to fail open, the pages themselves stay up.
-
-If usage ever gets close to the limit, add a route `burrowsapps.com/static/*` with Worker set to "None" in the dashboard, so assets skip the Worker.
-
-Remove it (the site then behaves as before iteration 1):
-
-```
-npx wrangler delete --config workers/agent-readiness/wrangler.jsonc
-```
+- Workers Routes: `burrowsapps.com/*` on the Worker `burrowsapps-com`. It is not in `wrangler.jsonc`, so a deploy never changes it and the deploy token needs no zone permission. The contact Worker's routes, `burrowsapps.com/api/contact*` and `www.burrowsapps.com/api/contact*`, are more specific and win.
+- Redirect Rule for `www`: filter `(http.host eq "www.burrowsapps.com" and not starts_with(http.request.uri.path, "/api/contact"))`, dynamic target `concat("https://burrowsapps.com", http.request.uri.path)`, status `301`, query string preserved.
+- Apex DNS: until the move is verified, the apex keeps its GitHub Pages `A` and `AAAA` records, proxied. They are then replaced by one proxied placeholder, `AAAA` `@` `100::`, added before the old records are deleted. The apex records move off GitHub before GitHub Pages is switched off, never the other way around: a GitHub-pointing record with Pages off lets anyone claim the name on their own Pages site. The `www` record is a proxied CNAME to the apex, not to GitHub, and stays.
+- The DNS-AID record below.
 
 #### DNS records
 
-One DNS-AID record, created by the owner in the Cloudflare dashboard. The zone is already DNSSEC-signed. Zone-file form:
+One DNS-AID record, created in the Cloudflare dashboard. The zone is already DNSSEC-signed. Zone-file form:
 
 ```
 _index._agents.burrowsapps.com. 300 IN SVCB 1 burrowsapps.com. alpn="h2,h3" port=443
@@ -119,14 +139,6 @@ curl -s -H 'accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?
 
 The answer must contain a record of type 64 and `"AD":true`. A resolver that asked before the record existed may answer "no data" for up to 30 minutes.
 
-#### After the merge, in order
-
-1. Deploy the Worker (command above).
-2. Owner: set both routes to fail open in the dashboard, and delete the four old exact routes if they are still listed.
-3. Owner: add the DNS record above.
-4. Wait 10 minutes after the Pages build: Cloudflare caches `robots.txt` and `static/js` at the edge for that long.
-5. Scan with isitagentready.com and read the probe log (below).
-
 #### Checks after a deploy
 
 ```
@@ -140,9 +152,11 @@ curl -s -o /dev/null -w '%{content_type}\n' https://burrowsapps.com/.well-known/
 curl -s -o /dev/null -w '%{content_type}\n' https://burrowsapps.com/.well-known/mcp/server-card.json
 curl -s -X POST https://burrowsapps.com/mcp -H 'Content-Type: application/json' -H 'MCP-Protocol-Version: 2026-07-28' -H 'Mcp-Method: server/discover' -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
 curl -s https://burrowsapps.com/.well-known/agent-skills/contact-burrows-applications/SKILL.md | shasum -a 256
+for p in README.md LICENSE CNAME wrangler.jsonc _headers .assetsignore .gitignore tests/robots.test.ts workers/contact/index.js workers/agent-readiness/facts.ts .github/workflows/build.yml; do curl -s -o /dev/null -w "%{http_code} /$p\n" "https://burrowsapps.com/$p"; done
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' 'https://www.burrowsapps.com/privacy.html?x=1'
 ```
 
-Expected, in order: a `Link` line that includes `rel="api-catalog"`; a markdown content type, `private, no-store`, a `vary` that includes `Accept`, and a token count; a markdown content type; `text/html`; `application/linkset+json`; `{"status":"ok",...}`; `application/json`; `application/json`; a JSON-RPC result with `"resultType":"complete"`; the digest from `.well-known/agent-skills/index.json`.
+Expected, in order: a `Link` line that includes `rel="api-catalog"`; a markdown content type, `private, no-store`, a `vary` that includes `Accept`, and a token count; a markdown content type; `text/html`; `application/linkset+json`; `{"status":"ok",...}`; `application/json`; `application/json`; a JSON-RPC result with `"resultType":"complete"`; the digest from `.well-known/agent-skills/index.json`; `404` for every repository file; `301 https://burrowsapps.com/privacy.html?x=1`.
 
 #### The markdown probe log
 
@@ -155,7 +169,7 @@ The scanner's markdown probe never reached the Worker on the old exact routes, a
 | fail | only Browser Rendering lines whose `accept` has no `markdown` | The header does not arrive as the scanner reports it. | Fallbacks below. |
 | fail | no line at all near the probe's time | The request does not run Workers on this zone. | Fallbacks below. |
 
-Fallbacks, for the owner to choose from: the zone's "Markdown for Agents" setting (Pro plan or higher); a URL Rewrite Rule that sends `Accept: text/markdown` requests for `/` to `/index.md`; serving the site from a Worker with static assets instead of GitHub Pages; or accepting 14 of 15.
+Fallbacks, for the owner to choose from: the zone's "Markdown for Agents" setting (Pro plan or higher); a URL Rewrite Rule that sends `Accept: text/markdown` requests for `/` to `/index.md`; or accepting 14 of 15.
 
 #### AI crawler policy
 

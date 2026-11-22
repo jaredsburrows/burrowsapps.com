@@ -1,0 +1,73 @@
+# Read by Cloudflare at deploy time and not served. It applies to static
+# files, including the two pages the Worker reads through its ASSETS binding
+# (/ and /privacy.html get the /* rule). Responses the Worker builds itself
+# (/mcp, /api/v1, the markdown variants) set their own headers in code.
+#
+# When several rules match one URL, their values for the same header are joined
+# with a comma. So a header set under /* must not be set again further down,
+# and no two rules below may match the same URL.
+
+# What GitHub Pages sent on every file, plus nosniff.
+/*
+  Access-Control-Allow-Origin: *
+  X-Content-Type-Options: nosniff
+
+# Without these every file is revalidated on every view. URLs are not
+# versioned, so code gets an hour and images a month.
+/static/css/*
+  Cache-Control: public, max-age=3600
+
+/static/js/*
+  Cache-Control: public, max-age=3600
+
+/static/img/*
+  Cache-Control: public, max-age=2592000
+
+/favicon.ico
+  Cache-Control: public, max-age=2592000
+
+# Markdown. Cloudflare infers the same type; stated here so it cannot change,
+# because the files contain non-ASCII punctuation.
+/index.md
+  Content-Type: text/markdown; charset=utf-8
+
+/privacy.md
+  Content-Type: text/markdown; charset=utf-8
+
+/auth.md
+  Content-Type: text/markdown; charset=utf-8
+
+/developers.md
+  Content-Type: text/markdown; charset=utf-8
+
+/.well-known/agent-skills/contact-burrows-applications/SKILL.md
+  Content-Type: text/markdown; charset=utf-8
+
+# Documents written by workers/agent-readiness/tools/write-documents.ts.
+# The first four have no file extension, so no type is inferred for them: the
+# Content-Type lines here are what make them usable.
+/.well-known/api-catalog
+  Content-Type: application/linkset+json
+  Cache-Control: public, max-age=300
+  Link: </.well-known/api-catalog>; rel="api-catalog"
+
+/.well-known/oauth-authorization-server
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
+/.well-known/oauth-protected-resource
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
+/mcp/server-card
+  Content-Type: application/mcp-server-card+json
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Methods: GET
+  Access-Control-Allow-Headers: Content-Type, If-None-Match
+  Access-Control-Expose-Headers: ETag
+
+/.well-known/mcp/server-card.json
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Methods: GET
+  Access-Control-Allow-Headers: Content-Type, If-None-Match
+  Access-Control-Expose-Headers: ETag

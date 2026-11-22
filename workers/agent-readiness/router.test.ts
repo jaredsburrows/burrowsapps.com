@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { DOCUMENTS } from "./documents.ts";
 import { OWNED_EXACT, route } from "./router.ts";
 import { BROWSER_ACCEPT, makeBaseEnv, makeDeps } from "./testing.ts";
 
@@ -171,10 +172,6 @@ test("4. a throwing handler is a 500 from the Worker, never the origin", async (
 
 test("12. the owned exact paths are exactly the documented ones", async () => {
   assert.deepEqual([...OWNED_EXACT].sort(), [
-    "/.well-known/api-catalog",
-    "/.well-known/mcp/server-card.json",
-    "/.well-known/oauth-authorization-server",
-    "/.well-known/oauth-protected-resource",
     "/api/v1",
     "/api/v1/",
     "/api/v1/company",
@@ -182,24 +179,30 @@ test("12. the owned exact paths are exactly the documented ones", async () => {
     "/api/v1/services",
     "/api/v1/status",
     "/mcp",
-    "/mcp/server-card",
   ]);
 });
 
-test("3. the catalog, the MCP endpoint, and the OAuth documents never reach the origin", async () => {
-  for (const [path, init] of [
-    ["/.well-known/api-catalog", {}],
-    ["/mcp", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }],
-    ["/.well-known/oauth-protected-resource", {}],
-  ] as const) {
+test("3. the MCP endpoint never reaches the static files", async () => {
+  const deps = makeDeps();
+  await route(new Request(`${SITE}/mcp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }), makeBaseEnv(), deps);
+  assert.equal(deps.passThroughCalls, 0);
+  assert.equal(deps.originCalls.length, 0);
+});
+
+test("a request for a generated document that reaches the Worker is handed to the static files once", async () => {
+  for (const path of Object.keys(DOCUMENTS)) {
     const deps = makeDeps();
-    await route(new Request(`${SITE}${path}`, init), makeBaseEnv(), deps);
-    assert.equal(deps.passThroughCalls, 0, path);
-    assert.equal(deps.originCalls.length, 0, path);
+    const file = new Response(DOCUMENTS[path], { status: 200 });
+    deps.setOrigin(() => file);
+    const request = get(path);
+    const response = await route(request, makeBaseEnv(), deps);
+    assert.equal(deps.originCalls.length, 1, path);
+    assert.equal(deps.originCalls[0], request, path);
+    assert.equal(response, file, path);
   }
 });
 
-test("auth.md and openid-configuration are left to the origin", async () => {
+test("auth.md and openid-configuration are left to the static files", async () => {
   for (const path of ["/auth.md", "/.well-known/openid-configuration"]) {
     const deps = makeDeps();
     await route(get(path), makeBaseEnv(), deps);

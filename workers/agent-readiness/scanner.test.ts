@@ -1,6 +1,8 @@
-// Replays, against route(), the pass criteria that the isitagentready.com
-// scanner documents for each check this branch adds, with the request shapes
-// the scanner's own scans recorded.
+// Replays the pass criteria that the isitagentready.com scanner documents for
+// each agent-readiness check, with the request shapes the scanner's own scans
+// recorded, against the emulated deployed site: the committed files with
+// .assetsignore, _headers, and run_worker_first applied, and the Worker
+// behind them (tests/support/static-site.ts).
 // It catches format mistakes against the documented criteria only; how
 // strictly the live scanner checks beyond them is not known.
 
@@ -8,15 +10,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
-import { route } from "./router.ts";
-import { makeBaseEnv, makeDeps } from "./testing.ts";
-import type { TestDeps } from "./testing.ts";
+import { site } from "../../tests/support/static-site.ts";
 
 const SITE = "https://burrowsapps.com";
 const REPO = new URL("../../", import.meta.url);
 
-const scan = async (url: string, headers: Record<string, string> = {}, deps: TestDeps = makeDeps()): Promise<Response> =>
-  route(new Request(url, { headers }), makeBaseEnv(), deps);
+const scan = (url: string, headers: Record<string, string> = {}): Promise<Response> => site(new Request(url, { headers }));
 
 const jsonOf = async (response: Response): Promise<Record<string, any>> => {
   assert.equal(response.status, 200);
@@ -60,9 +59,7 @@ test("apiCatalog: a linkset whose entries have anchor, service-desc, and service
 });
 
 test("oauthDiscovery: openid-configuration is not owned, and RFC 8414 metadata has the read fields", async () => {
-  const deps = makeDeps();
-  await scan(`${SITE}/.well-known/openid-configuration`, {}, deps);
-  assert.equal(deps.originCalls.length, 1, "openid-configuration must be left to the origin, which 404s it");
+  assert.equal((await scan(`${SITE}/.well-known/openid-configuration`)).status, 404, "openid-configuration must not exist");
   assert.equal(resolveSiteUrl(`${SITE}/.well-known/openid-configuration`), null);
   const metadata = await jsonOf(await scan(`${SITE}/.well-known/oauth-authorization-server`));
   for (const field of ["issuer", "authorization_endpoint", "token_endpoint", "grant_types_supported", "response_types_supported"]) {
@@ -82,9 +79,9 @@ test("oauthProtectedResource: the homepage sends no challenge and the metadata h
 test("authMd: auth.md, the PRM, and the AS metadata agree on the anonymous method", async () => {
   const text = await readFile(new URL("auth.md", REPO), "utf8");
   assert.match(text.split("\n")[0], /^# .*auth\.md/);
-  const deps = makeDeps();
-  await scan(`${SITE}/auth.md`, { Accept: "text/markdown, text/plain, */*" }, deps);
-  assert.equal(deps.originCalls.length, 1, "auth.md is served by Pages");
+  const served = await scan(`${SITE}/auth.md`, { Accept: "text/markdown, text/plain, */*" });
+  assert.equal(served.status, 200, "auth.md is a published file");
+  assert.equal(served.headers.get("Content-Type"), "text/markdown; charset=utf-8");
 
   const prm = await jsonOf(await scan(`${SITE}/.well-known/oauth-protected-resource`, { Accept: "application/json" }));
   for (const field of ["resource", "authorization_servers", "scopes_supported", "bearer_methods_supported"]) assert.ok(field in prm, field);

@@ -5,12 +5,14 @@
 export type OriginFetch = (request: Request) => Promise<Response>;
 
 export type PageLink = { href: string; rel: string; type?: string };
-export type Page = { markdown: string; links: readonly PageLink[] };
+// asset: the path the asset router serves the page's HTML file at.
+export type Page = { asset: string; markdown: string; links: readonly PageLink[] };
 
-// Only IANA-registered relations, each pointing at a file in this repo or a
+// Only IANA-registered relations, each pointing at a published file or a
 // path this Worker serves. Targets are path-absolute.
 export const PAGES: Readonly<Record<string, Page>> = {
   "/": {
+    asset: "/",
     markdown: "/index.md",
     links: [
       { href: "/index.md", rel: "alternate", type: "text/markdown" },
@@ -23,6 +25,7 @@ export const PAGES: Readonly<Record<string, Page>> = {
     ],
   },
   "/privacy.html": {
+    asset: "/privacy",
     markdown: "/privacy.md",
     links: [{ href: "/privacy.md", rel: "alternate", type: "text/markdown" }],
   },
@@ -63,8 +66,9 @@ export function estimateTokens(markdown: string): number {
   return Math.floor(new TextEncoder().encode(markdown).length / 4);
 }
 
-// Fetches the page's markdown file from the origin. Returns null whenever the
-// result is not usable markdown, so the caller can fall back to HTML.
+// Fetches the page's markdown file from the static files. Returns null
+// whenever the result is not usable markdown, so the caller can fall back to
+// HTML.
 async function markdownResponse(request: Request, page: Page, originFetch: OriginFetch): Promise<Response | null> {
   // Built from request.url so a request to www stays on www.
   const subrequest = new Request(new URL(page.markdown, request.url), {
@@ -92,16 +96,29 @@ async function markdownResponse(request: Request, page: Page, originFetch: Origi
   return new Response(request.method === "HEAD" ? null : markdown, { status: 200, headers });
 }
 
-// True when the origin's Vary already covers Accept, either by naming it or
+// True when the file's Vary already covers Accept, either by naming it or
 // with "*", which must stand alone and already means "varies on everything".
 function varyCoversAccept(vary: string | null): boolean {
   return (vary ?? "").split(",").some((token) => ["accept", "*"].includes(token.trim().toLowerCase()));
 }
 
+// The request to send the asset router for a page's HTML. It serves
+// privacy.html at "/privacy" and answers a request for "/privacy.html" with a
+// redirect there, so a GET or HEAD for a page asks for the path it serves,
+// with the visitor's own method and headers. Any other request is unchanged.
+export function assetRequest(request: Request): Request {
+  if (request.method !== "GET" && request.method !== "HEAD") return request;
+  const url = new URL(request.url);
+  const page = PAGES[url.pathname];
+  if (!page || page.asset === url.pathname) return request;
+  return new Request(new URL(page.asset, url), request);
+}
+
 export async function handle(request: Request, originFetch: OriginFetch): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return originFetch(request);
   // The query string is ignored, so "/?sent=1" and "/?utm_source=x" are decorated as "/".
-  const page = PAGES[new URL(request.url).pathname];
+  const url = new URL(request.url);
+  const page = PAGES[url.pathname];
   if (!page) return originFetch(request);
 
   if (prefersMarkdown(request.headers.get("Accept"))) {
@@ -113,8 +130,8 @@ export async function handle(request: Request, originFetch: OriginFetch): Promis
     }
   }
 
-  // Errors here propagate; the entry point owns the last retry.
-  const response = await originFetch(request);
+  // Errors here propagate; the router owns the last retry.
+  const response = await originFetch(assetRequest(request));
   try {
     if (response.status !== 200 && response.status !== 304) return response;
     const out = new Response(response.body, response);

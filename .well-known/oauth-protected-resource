@@ -1,0 +1,20 @@
+{
+  "status": "not_offered",
+  "available": false,
+  "message": "Burrows Applications has no login. No authorization server runs on this origin, and nothing here needs or accepts a credential.",
+  "description": "This document exists so that tools looking for OAuth metadata get an explicit answer. The standard fields are present because readers of this format expect them, and the scope and bearer values are placeholders: nothing on this origin is protected and none of this describes a working flow. Clients must not attempt authorization, registration, claim or token requests; every URL here can be fetched without a credential.",
+  "resource": "https://burrowsapps.com",
+  "authorization_servers": [
+    "https://burrowsapps.com"
+  ],
+  "scopes_supported": [
+    "public"
+  ],
+  "bearer_methods_supported": [
+    "header"
+  ],
+  "resource_documentation": "https://burrowsapps.com/auth.md",
+  "mcp_url": "https://burrowsapps.com/mcp",
+  "mcp_server_card_url": "https://burrowsapps.com/.well-known/mcp/server-card.json",
+  "api_catalog_url": "https://burrowsapps.com/.well-known/api-catalog"
+}

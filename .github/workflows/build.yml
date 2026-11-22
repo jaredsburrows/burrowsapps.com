@@ -6,6 +6,9 @@ on:
       - gh-pages
   pull_request:
     types: [ opened, labeled, unlabeled, synchronize ]
+  # Manual run from the Actions tab. The checks run first here too, and the
+  # deploy job's own condition still applies.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,6 +31,8 @@ jobs:
     steps:
       - name: Checkout Project
         uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Configure JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v6.3.0
@@ -51,3 +56,38 @@ jobs:
 
       - name: Run tests
         run: node --test "tests/*.test.ts" "workers/agent-readiness/*.test.ts"
+
+      # No credentials: proves the config, the bundle, and the asset upload
+      # list are valid without showing the Cloudflare token to a pull request.
+      - name: Validate Cloudflare config (dry run)
+        run: npx --yes wrangler@4.166.0 deploy --dry-run
+
+  # In this workflow, not its own, so that `needs` can hold it back until the
+  # checks pass.
+  deploy:
+    name: Deploy to Cloudflare
+    needs: checks
+    # Never from a pull request, and only from gh-pages.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/gh-pages'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # Deploys queue instead of racing, and a running upload is never canceled.
+    concurrency:
+      group: cloudflare-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pinned by commit SHA: the only third-party action, and the only step that receives the token.
+      - name: Deploy
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # The same wrangler as the dry run; tests/workflow.test.ts keeps them equal.
+          wranglerVersion: "4.166.0"
+          command: deploy
