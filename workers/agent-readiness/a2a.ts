@@ -220,11 +220,11 @@ function validParts(parts: unknown): parts is Record<string, unknown>[] {
   return parts.every((part) => isObject(part) && PART_KINDS.filter((kind) => part[kind] !== undefined).length === 1);
 }
 
-const isTextPart = (part: Record<string, unknown>): boolean =>
-  typeof part.text === "string" && (part.mediaType === undefined || part.mediaType === "text/plain");
-
 const mediaType = (value: unknown): string =>
   typeof value === "string" ? (value.split(";")[0] ?? "").trim().toLowerCase() : "";
+
+const isTextPart = (part: Record<string, unknown>): boolean =>
+  typeof part.text === "string" && (part.mediaType === undefined || mediaType(part.mediaType) === "text/plain");
 
 function sendMessage(id: Id, params: Record<string, unknown>): Response {
   const message = params.message;
