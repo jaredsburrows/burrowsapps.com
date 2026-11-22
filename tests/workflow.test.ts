@@ -29,6 +29,11 @@ test("the Cloudflare token is referenced once, in the deploy job", async () => {
   assert.ok(job("deploy").includes("secrets.CLOUDFLARE_API_TOKEN"));
 });
 
+test("the deploy job runs in the production environment, and the checks job in none", async () => {
+  assert.deepEqual(job("deploy").split("\n").filter((line) => /^ {4}environment:/.test(line)), ["    environment: production"]);
+  assert.ok(!/^ {4}environment:/m.test(job("checks")));
+});
+
 test("the token appears nowhere outside the deploy job", async () => {
   const deploy = job("deploy");
   assert.ok(!WORKFLOW.replace(deploy, "").includes("CLOUDFLARE_API_TOKEN"));
