@@ -124,7 +124,7 @@ test("styles get an hour of cache and images a month", async () => {
 });
 
 test("repository files that are not part of the site answer with the 404 page", async () => {
-  for (const path of ["/README.md", "/tests/robots.test.ts", "/workers/contact/index.js", "/wrangler.jsonc", "/.team/STATUS.md", "/CNAME"]) {
+  for (const path of ["/README.md", "/tests/robots.test.ts", "/workers/contact/index.js", "/wrangler.jsonc", "/.team/STATUS.md", "/CNAME", "/_headers", "/.assetsignore", "/.gitignore", "/.github/workflows/build.yml", "/workers/agent-readiness/facts.ts", "/LICENSE"]) {
     const response = await get(path);
     assert.equal(response.status, 404, path);
     assert.equal(await response.text(), NOT_FOUND_PAGE, path);
@@ -154,4 +154,39 @@ test("files are typed by extension as Cloudflare infers it", async () => {
   assert.equal((await get("/favicon.ico")).headers.get("Content-Type"), "image/vnd.microsoft.icon");
   assert.equal((await get("/robots.txt")).headers.get("Content-Type"), "text/plain; charset=utf-8");
   assert.equal((await get("/sitemap.xml")).headers.get("Content-Type"), "application/xml");
+});
+
+// Everything in a published folder is public, and the classification test
+// above reads only the top level. This list is what a deploy uploads: a new
+// file in static/, .well-known/, or mcp/ (a backup, a note, a test) fails
+// here until someone decides it is part of the site.
+const PUBLISHED_FILES = [
+  ".well-known/agent-skills/contact-burrows-applications/SKILL.md",
+  ".well-known/agent-skills/index.json",
+  ".well-known/ai-catalog.json",
+  ".well-known/api-catalog",
+  ".well-known/ard.json",
+  ".well-known/mcp/server-card.json",
+  ".well-known/oauth-authorization-server",
+  ".well-known/oauth-protected-resource",
+  ".well-known/security.txt",
+  "404.html",
+  "auth.md",
+  "developers.md",
+  "favicon.ico",
+  "index.html",
+  "index.md",
+  "mcp/server-card",
+  "privacy.html",
+  "privacy.md",
+  "robots.txt",
+  "sitemap.xml",
+  "static/css/home.css",
+  "static/img/apple-touch-icon.png",
+  "static/img/og.jpg",
+  "static/js/home.js",
+];
+
+test("the published files are exactly the site's files", async () => {
+  assert.deepEqual(publishedPaths(), PUBLISHED_FILES, "a file in a published folder is public: list it here or add it to .assetsignore");
 });

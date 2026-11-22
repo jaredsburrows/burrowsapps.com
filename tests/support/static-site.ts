@@ -90,7 +90,7 @@ export function publishedFile(pathname: string): URL | null {
   if (/\/\.\.?$/.test(path)) return null;
   const candidate = (relative: string): URL | null => {
     const file = new URL(`./${relative}`, REPO);
-    return !isIgnored(relative) && isFile(file) ? file : null;
+    return !isIgnored(relative) && !CONSUMED_TOP_LEVEL.includes(relative) && isFile(file) ? file : null;
   };
   if (path.endsWith("/")) return candidate(`${path.slice(1)}index.html`);
   if (path.endsWith(".html")) return null;
