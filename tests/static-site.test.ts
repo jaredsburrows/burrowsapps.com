@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import {
+  assetFetch,
   CONSUMED_TOP_LEVEL,
   PUBLIC_TOP_LEVEL,
   headerRules,
@@ -128,4 +129,15 @@ test("repository files that are not part of the site answer with the 404 page", 
     assert.equal(response.status, 404, path);
     assert.equal(await response.text(), NOT_FOUND_PAGE, path);
   }
+});
+
+test("/privacy.html is the decorated page, not the asset router's redirect", async () => {
+  const response = await get("/privacy.html");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Content-Type"), "text/html; charset=utf-8");
+  assert.equal(response.headers.get("Link"), '</privacy.md>; rel="alternate"; type="text/markdown"');
+  assert.equal(await response.text(), readFileSync(new URL("privacy.html", REPO), "utf8"));
+  const plain = await assetFetch(new Request(`${SITE}/privacy.html`));
+  assert.equal(plain.status, 307);
+  assert.equal(plain.headers.get("Location"), "/privacy");
 });

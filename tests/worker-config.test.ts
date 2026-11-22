@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { PAGES } from "../workers/agent-readiness/handler.ts";
 import { resolveSiteUrl } from "./support/site-map.ts";
-import { publishedPaths, runsWorkerFirst, servedPath } from "./support/static-site.ts";
+import { publishedFile, publishedPaths, runsWorkerFirst, servedPath } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
 const SITE_CONFIG = new URL("wrangler.jsonc", REPO);
@@ -76,6 +76,14 @@ test("the assets settings are exactly the ones the Worker and the tests depend o
 
 test("every page the Worker decorates runs the Worker first", async () => {
   for (const path of Object.keys(PAGES)) assert.ok(runsWorkerFirst(path), `${path} is not in run_worker_first`);
+});
+
+test("every page's asset path is served from an HTML file", async () => {
+  for (const [path, page] of Object.entries(PAGES)) {
+    const file = publishedFile(page.asset);
+    assert.ok(file, `${path}: ${page.asset} is not a published file`);
+    assert.ok(file.pathname.endsWith(".html"), `${path}: ${page.asset} is ${file.pathname}`);
+  }
 });
 
 test("no published file runs the Worker first, apart from the pages it decorates", async () => {
