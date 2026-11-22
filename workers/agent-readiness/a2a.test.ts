@@ -132,6 +132,78 @@ test("card: every URL on it is a published file or a path the Worker owns", () =
   }
 });
 
+// Methods other than SendMessage
+
+test("ListTasks: answers an empty list, because no task is ever created", async () => {
+  const response = await send(a2a("ListTasks", {}));
+  assert.equal(response.status, 200);
+  const body = await rpc(response);
+  assert.equal(body.id, 1);
+  assert.equal(body.error, undefined);
+  assert.deepEqual(body.result, { tasks: [], nextPageToken: "", pageSize: 0, totalSize: 0 });
+});
+
+test("ListTasks: answers the same without params", async () => {
+  const body = await rpc(await send(a2a("ListTasks")));
+  assert.deepEqual(body.result, { tasks: [], nextPageToken: "", pageSize: 0, totalSize: 0 });
+});
+
+test("GetTask: a task id is -32001 Task not found", async () => {
+  const body = await expectA2aError(await send(a2a("GetTask", { id: "task-1" })), -32001, "TASK_NOT_FOUND");
+  assert.equal(body.id, 1);
+  assert.ok(!JSON.stringify(body).includes("task-1"), "the task id is not echoed");
+});
+
+test("GetTask: no task id is -32602", async () => {
+  const body = await expectError(await send(a2a("GetTask", {})), 200, -32602);
+  assert.equal(body.error?.data, undefined);
+});
+
+test("CancelTask: a task id is -32001 Task not found", async () => {
+  await expectA2aError(await send(a2a("CancelTask", { id: "task-1" })), -32001, "TASK_NOT_FOUND");
+});
+
+test("CancelTask: an empty or non-string task id is -32602", async () => {
+  await expectError(await send(a2a("CancelTask", { id: "" })), 200, -32602);
+  await expectError(await send(a2a("CancelTask", { id: 5 })), 200, -32602);
+});
+
+test("SendStreamingMessage: -32004, streaming is off", async () => {
+  await expectA2aError(await send(a2a("SendStreamingMessage", { message: {} })), -32004, "UNSUPPORTED_OPERATION");
+});
+
+test("SubscribeToTask: -32004, streaming is off", async () => {
+  await expectA2aError(await send(a2a("SubscribeToTask", { id: "task-1" })), -32004, "UNSUPPORTED_OPERATION");
+});
+
+test("GetExtendedAgentCard: -32004, there is no extended card", async () => {
+  await expectA2aError(await send(a2a("GetExtendedAgentCard", {})), -32004, "UNSUPPORTED_OPERATION");
+});
+
+test("CreateTaskPushNotificationConfig: -32003, push notifications are off", async () => {
+  await expectA2aError(await send(a2a("CreateTaskPushNotificationConfig", { taskId: "t" })), -32003, "PUSH_NOTIFICATION_NOT_SUPPORTED");
+});
+
+test("GetTaskPushNotificationConfig: -32003, push notifications are off", async () => {
+  await expectA2aError(await send(a2a("GetTaskPushNotificationConfig", { taskId: "t", id: "c" })), -32003, "PUSH_NOTIFICATION_NOT_SUPPORTED");
+});
+
+test("ListTaskPushNotificationConfigs: -32003, push notifications are off", async () => {
+  await expectA2aError(await send(a2a("ListTaskPushNotificationConfigs", { taskId: "t" })), -32003, "PUSH_NOTIFICATION_NOT_SUPPORTED");
+});
+
+test("DeleteTaskPushNotificationConfig: -32003, push notifications are off", async () => {
+  await expectA2aError(await send(a2a("DeleteTaskPushNotificationConfig", { taskId: "t", id: "c" })), -32003, "PUSH_NOTIFICATION_NOT_SUPPORTED");
+});
+
+for (const method of ["message/send", "tasks/get", "nope"]) {
+  test(`${method}: -32601 Method not found, with no data`, async () => {
+    const body = await expectError(await send(a2a(method, {})), 200, -32601);
+    assert.equal(body.error?.data, undefined);
+    assert.ok(!JSON.stringify(body).includes(method), "the method name is not echoed");
+  });
+}
+
 // Version
 
 for (const [label, value] of [["missing", null], ["empty", ""], ["0.3", "0.3"], ["2.0", "2.0"], ["7.31", "7.31"], ["banana", "banana"]] as const) {
@@ -147,14 +219,16 @@ for (const [label, value] of [["missing", null], ["empty", ""], ["0.3", "0.3"], 
 
 for (const value of ["1.0", "1.0.0", " 1.0 "]) {
   test(`version: A2A-Version ${JSON.stringify(value)} is accepted`, async () => {
-    const body = await rpc(await send(a2a("nope", {}, { "A2A-Version": value })));
-    assert.notEqual(body.error?.code, -32009);
+    const body = await rpc(await send(a2a("ListTasks", {}, { "A2A-Version": value })));
+    assert.equal(body.error, undefined, JSON.stringify(body));
+    assert.deepEqual(body.result?.tasks, []);
   });
 }
 
 test("version: the A2A-Version query parameter is accepted without the header", async () => {
-  const body = await rpc(await send(a2a("nope", {}, { "A2A-Version": null }), makeBaseEnv(), `${ENDPOINT}?A2A-Version=1.0`));
-  assert.notEqual(body.error?.code, -32009);
+  const body = await rpc(await send(a2a("ListTasks", {}, { "A2A-Version": null }), makeBaseEnv(), `${ENDPOINT}?A2A-Version=1.0`));
+  assert.equal(body.error, undefined, JSON.stringify(body));
+  assert.deepEqual(body.result?.tasks, []);
 });
 
 test("version: a notification gets 202 even without a version", async () => {

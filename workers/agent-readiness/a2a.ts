@@ -172,8 +172,52 @@ function supportedVersion(request: Request): boolean {
   return match !== null && `${match[1]}.${match[2]}` === A2A_VERSION;
 }
 
-function dispatch(id: Id, _method: string, _params: Record<string, unknown>): Response {
-  return rpcError(id, -32601, "Method not found");
+function reply(id: Id, skillId: string, answer: Answer, contextId: string): Response {
+  return rpcResult(id, {
+    message: {
+      messageId: crypto.randomUUID(),
+      contextId,
+      role: "ROLE_AGENT",
+      parts: [
+        { text: answer.text, mediaType: "text/plain" },
+        { data: answer.data, mediaType: "application/json" },
+      ],
+      metadata: { skillId },
+    },
+  });
+}
+
+function sendMessage(id: Id, _params: Record<string, unknown>): Response {
+  return reply(id, "help", helpAnswer(), crypto.randomUUID());
+}
+
+// No task is ever created, so no task id names one.
+function taskById(id: Id, params: Record<string, unknown>): Response {
+  if (typeof params.id !== "string" || params.id === "") return rpcError(id, -32602, "Invalid params");
+  return rpcError(id, -32001, "Task not found");
+}
+
+function dispatch(id: Id, method: string, params: Record<string, unknown>): Response {
+  switch (method) {
+    case "SendMessage":
+      return sendMessage(id, params);
+    case "GetTask":
+    case "CancelTask":
+      return taskById(id, params);
+    case "ListTasks":
+      return rpcResult(id, { tasks: [], nextPageToken: "", pageSize: 0, totalSize: 0 });
+    case "SendStreamingMessage":
+    case "SubscribeToTask":
+    case "GetExtendedAgentCard":
+      return rpcError(id, -32004, "Unsupported operation");
+    case "CreateTaskPushNotificationConfig":
+    case "GetTaskPushNotificationConfig":
+    case "ListTaskPushNotificationConfigs":
+    case "DeleteTaskPushNotificationConfig":
+      return rpcError(id, -32003, "Push notifications are not supported");
+    default:
+      return rpcError(id, -32601, "Method not found");
+  }
 }
 
 export async function endpoint(request: Request, env: Env): Promise<Response> {
