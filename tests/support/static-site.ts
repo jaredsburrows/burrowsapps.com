@@ -4,7 +4,7 @@
 // tests can check what will be served and not only what the Worker returns.
 // Each rule names the Cloudflare Workers documentation page it follows.
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 const REPO = new URL("../../", import.meta.url);
 
@@ -47,6 +47,26 @@ export function isIgnored(relativePath: string): boolean {
   return relativePath.split("/").some((segment) => names.includes(segment));
 }
 
+// Every file that is uploaded, as a path relative to the repository root.
+export function publishedPaths(): string[] {
+  const walk = (folder: string): string[] =>
+    readdirSync(new URL(`./${folder}`, REPO), { withFileTypes: true }).flatMap((entry) => {
+      const relative = `${folder}${entry.name}`;
+      if (isIgnored(relative) || (folder === "" && CONSUMED_TOP_LEVEL.includes(entry.name))) return [];
+      return entry.isDirectory() ? walk(`${relative}/`) : [relative];
+    });
+  return walk("").sort();
+}
+
+// The URL the asset router serves a file at: "a/index.html" at "/a/",
+// "a.html" at "/a", anything else at its own path (Static Assets, "HTML
+// handling").
+export function servedPath(relative: string): string {
+  if (relative === "index.html" || relative.endsWith("/index.html")) return `/${relative.slice(0, -"index.html".length)}`;
+  if (relative.endsWith(".html")) return `/${relative.slice(0, -".html".length)}`;
+  return `/${relative}`;
+}
+
 const isFile = (url: URL): boolean => existsSync(url) && statSync(url).isFile();
 
 // The repository file the asset router serves for a path, or null when none
@@ -72,4 +92,26 @@ export function publishedFile(pathname: string): URL | null {
   if (path.endsWith("/")) return candidate(`${path.slice(1)}index.html`);
   if (path.endsWith(".html")) return null;
   return candidate(path.slice(1)) ?? candidate(`${path.slice(1)}.html`);
+}
+
+type SiteConfig = { assets: { run_worker_first: string[] } };
+
+// wrangler.jsonc uses whole-line comments only, so dropping those lines leaves
+// plain JSON.
+const siteConfig = (): SiteConfig =>
+  JSON.parse(
+    readFileSync(new URL("wrangler.jsonc", REPO), "utf8")
+      .split("\n")
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join("\n"),
+  );
+
+// True when a path matches assets.run_worker_first: exactly, or as a prefix
+// when the pattern ends in "*" (Static Assets, "run_worker_first").
+// Assumption, checked under wrangler dev before the merge: a pattern is
+// matched against the path alone, so "/?sent=1" matches "/".
+export function runsWorkerFirst(pathname: string): boolean {
+  return siteConfig().assets.run_worker_first.some((pattern) =>
+    pattern.endsWith("*") ? pathname.startsWith(pattern.slice(0, -1)) : pathname === pattern,
+  );
 }

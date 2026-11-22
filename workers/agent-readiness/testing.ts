@@ -78,7 +78,7 @@ export function makeDeps(overrides: Partial<Deps> = {}): TestDeps {
 
 export type TestEnv = Env & { PUBLIC_LIMITER: FakeLimiter };
 
-// The limit matches workers/agent-readiness/wrangler.jsonc.
+// The limit matches PUBLIC_LIMITER in the root wrangler.jsonc.
 export function makeBaseEnv(): TestEnv {
   return { PUBLIC_LIMITER: fakeLimiter(60) };
 }

@@ -9,11 +9,11 @@ const REPO = new URL("../", import.meta.url);
 const read = (path: string): Promise<string> => readFile(new URL(path, REPO), "utf8");
 
 // Whole-line comments only, so dropping them leaves plain JSON.
-const agentConfig = async (): Promise<{ ratelimits: { name: string; simple: { limit: number; period: number } }[] }> =>
-  JSON.parse((await read("workers/agent-readiness/wrangler.jsonc")).split("\n").filter((line) => !/^\s*\/\//.test(line)).join("\n"));
+const siteConfig = async (): Promise<{ ratelimits: { name: string; simple: { limit: number; period: number } }[] }> =>
+  JSON.parse((await read("wrangler.jsonc")).split("\n").filter((line) => !/^\s*\/\//.test(line)).join("\n"));
 
 const limiter = async (name: string): Promise<{ limit: number; period: number }> => {
-  const found = (await agentConfig()).ratelimits.find((entry) => entry.name === name);
+  const found = (await siteConfig()).ratelimits.find((entry) => entry.name === name);
   assert.ok(found, `${name} is not in wrangler.jsonc`);
   return found.simple;
 };
