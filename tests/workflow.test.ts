@@ -29,6 +29,17 @@ test("the Cloudflare token is referenced once, in the deploy job", async () => {
   assert.ok(job("deploy").includes("secrets.CLOUDFLARE_API_TOKEN"));
 });
 
+test("the token appears nowhere outside the deploy job", async () => {
+  const deploy = job("deploy");
+  assert.ok(!WORKFLOW.replace(deploy, "").includes("CLOUDFLARE_API_TOKEN"));
+});
+
+test("the deploy action is pinned to a full commit SHA", async () => {
+  const uses = [...WORKFLOW.matchAll(/uses: cloudflare\/wrangler-action@(\S+)/g)].map(([, ref]) => ref);
+  assert.equal(uses.length, 1);
+  assert.match(uses[0], /^[0-9a-f]{40}$/);
+});
+
 test("the workflow never runs with secrets for a pull request from a fork", async () => {
   assert.ok(!WORKFLOW.includes("pull_request_target"));
 });
