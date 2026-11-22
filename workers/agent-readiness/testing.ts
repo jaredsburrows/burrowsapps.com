@@ -78,9 +78,17 @@ export function makeDeps(overrides: Partial<Deps> = {}): TestDeps {
 
 export type TestEnv = Env & { PUBLIC_LIMITER: FakeLimiter };
 
-// The limit matches PUBLIC_LIMITER in the root wrangler.jsonc.
+// The limit matches PUBLIC_LIMITER in the root wrangler.jsonc. Tests read
+// files through deps.originFetch, so reaching the binding directly fails.
 export function makeBaseEnv(): TestEnv {
-  return { PUBLIC_LIMITER: fakeLimiter(60) };
+  return {
+    ASSETS: {
+      fetch: async () => {
+        throw new Error("use deps.originFetch");
+      },
+    },
+    PUBLIC_LIMITER: fakeLimiter(60),
+  };
 }
 
 export const BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";

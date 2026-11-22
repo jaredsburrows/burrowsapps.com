@@ -98,6 +98,14 @@ test("no published file runs the Worker first, apart from the pages it decorates
   }
 });
 
+test("Env declares the ASSETS binding the config names", async () => {
+  const source = await readFile(HTTP_SOURCE, "utf8");
+  const block = source.match(/export type Env = \{([^}]*)\}/);
+  assert.ok(block, "Env type not found in http.ts");
+  assert.match(block[1], /^\s*ASSETS: AssetFetcher;$/m);
+  assert.equal((await readConfig(SITE_CONFIG)).assets?.binding, "ASSETS");
+});
+
 test("the old Worker config is gone", async () => {
   assert.ok(!existsSync(new URL("workers/agent-readiness/wrangler.jsonc", REPO)));
 });

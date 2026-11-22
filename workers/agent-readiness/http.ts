@@ -5,7 +5,10 @@ import type { OriginFetch } from "./handler.ts";
 export type { OriginFetch };
 export type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
+export type AssetFetcher = { fetch(request: Request): Promise<Response> };
+
 export type Env = {
+  ASSETS: AssetFetcher;
   PUBLIC_LIMITER?: RateLimiter;
 };
 
