@@ -172,23 +172,97 @@ function supportedVersion(request: Request): boolean {
   return match !== null && `${match[1]}.${match[2]}` === A2A_VERSION;
 }
 
-function reply(id: Id, skillId: string, answer: Answer, contextId: string): Response {
-  return rpcResult(id, {
-    message: {
-      messageId: crypto.randomUUID(),
-      contextId,
-      role: "ROLE_AGENT",
-      parts: [
-        { text: answer.text, mediaType: "text/plain" },
-        { data: answer.data, mediaType: "application/json" },
-      ],
-      metadata: { skillId },
-    },
-  });
+// The SendMessageResponse: always a direct message, never a task. Only the
+// parts whose media type the client accepts; null when none is left.
+function buildReply(skillId: string, answer: Answer, contextId: string, modes: readonly string[]): Record<string, unknown> | null {
+  const parts = [
+    { text: answer.text, mediaType: "text/plain" },
+    { data: answer.data, mediaType: "application/json" },
+  ].filter((part) => modes.includes(part.mediaType));
+  if (parts.length === 0) return null;
+  return {
+    message: { messageId: crypto.randomUUID(), contextId, role: "ROLE_AGENT", parts, metadata: { skillId } },
+  };
 }
 
-function sendMessage(id: Id, _params: Record<string, unknown>): Response {
-  return reply(id, "help", helpAnswer(), crypto.randomUUID());
+const PART_KINDS = ["text", "raw", "url", "data"] as const;
+const MAX_PARTS = 16;
+const CONTEXT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+
+// Checked in order; the first match wins.
+const KEYWORDS: readonly (readonly [string, RegExp])[] = [
+  ["contact-options", /\b(contact|email|e-mail|reach|touch|hire|hiring|inquiry|inquire|quote)\b/],
+  ["services", /\b(services?|builds?|building|offers?|platforms?|android|ios|kotlin|multiplatform|kmp|websites?|apps?)\b/],
+  ["company-profile", /\b(who|about|company|profile|founder|founded|what is)\b/],
+];
+
+const knownSkill = (value: unknown): value is string => typeof value === "string" && Object.hasOwn(ANSWERS, value);
+
+function metadataSkill(metadata: unknown): unknown {
+  return isObject(metadata) ? metadata.skillId : undefined;
+}
+
+// metadata.skillId on the message, then on the request; then the text equal
+// to a skill id; then the keyword rules; otherwise the help reply.
+function chooseSkill(message: Record<string, unknown>, params: Record<string, unknown>, text: string): string {
+  for (const candidate of [metadataSkill(message.metadata), metadataSkill(params.metadata)]) {
+    if (knownSkill(candidate)) return candidate;
+  }
+  if (knownSkill(text)) return text;
+  for (const [skillId, pattern] of KEYWORDS) {
+    if (pattern.test(text)) return skillId;
+  }
+  return "help";
+}
+
+function validParts(parts: unknown): parts is Record<string, unknown>[] {
+  if (!Array.isArray(parts) || parts.length < 1 || parts.length > MAX_PARTS) return false;
+  return parts.every((part) => isObject(part) && PART_KINDS.filter((kind) => part[kind] !== undefined).length === 1);
+}
+
+const isTextPart = (part: Record<string, unknown>): boolean =>
+  typeof part.text === "string" && (part.mediaType === undefined || part.mediaType === "text/plain");
+
+const mediaType = (value: unknown): string =>
+  typeof value === "string" ? (value.split(";")[0] ?? "").trim().toLowerCase() : "";
+
+function sendMessage(id: Id, params: Record<string, unknown>): Response {
+  const message = params.message;
+  if (
+    !isObject(message)
+    || message.role !== "ROLE_USER"
+    || typeof message.messageId !== "string"
+    || message.messageId === ""
+    || message.messageId.length > MAX_ID_LENGTH
+    || !validParts(message.parts)
+  ) {
+    return rpcError(id, -32602, "Invalid params");
+  }
+  const parts = message.parts as Record<string, unknown>[];
+  if (!parts.every(isTextPart)) {
+    if (parts.some((part) => part.text !== undefined && typeof part.text !== "string")) return rpcError(id, -32602, "Invalid params");
+    return rpcError(id, -32005, "Content type not supported");
+  }
+  if (message.taskId !== undefined) return rpcError(id, -32001, "Task not found");
+  if (message.contextId !== undefined && (typeof message.contextId !== "string" || !CONTEXT_ID.test(message.contextId))) {
+    return rpcError(id, -32602, "Invalid params");
+  }
+  const configuration = params.configuration ?? {};
+  if (!isObject(configuration)) return rpcError(id, -32602, "Invalid params");
+  if (configuration.taskPushNotificationConfig !== undefined || configuration.pushNotificationConfig !== undefined) {
+    return rpcError(id, -32003, "Push notifications are not supported");
+  }
+  const accepted = configuration.acceptedOutputModes;
+  if (accepted !== undefined && !Array.isArray(accepted)) return rpcError(id, -32602, "Invalid params");
+  const modes = Array.isArray(accepted) && accepted.length > 0 ? accepted.map(mediaType) : [...MODES];
+
+  const text = parts.map((part) => part.text).join(" ").toLowerCase().trim();
+  const skillId = chooseSkill(message, params, text);
+  const answer = skillId === "help" ? helpAnswer() : ANSWERS[skillId]();
+  const contextId = typeof message.contextId === "string" ? message.contextId : crypto.randomUUID();
+  const reply = buildReply(skillId, answer, contextId, modes);
+  if (reply === null) return rpcError(id, -32005, "Content type not supported");
+  return rpcResult(id, reply);
 }
 
 // No task is ever created, so no task id names one.

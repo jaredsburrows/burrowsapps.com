@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { A2A_VERSION, AGENT_CARD, AGENT_CARD_PATH, ANSWERS, SKILLS, endpoint } from "./a2a.ts";
+import { COMPANY, SERVICES, contactOptions } from "./facts.ts";
 import { resolveSiteUrl } from "../../tests/support/site-map.ts";
 import { makeBaseEnv } from "./testing.ts";
 import type { TestEnv } from "./testing.ts";
@@ -131,6 +132,222 @@ test("card: every URL on it is a published file or a path the Worker owns", () =
     assert.equal(resolveSiteUrl(url), "file", url);
   }
 });
+
+// SendMessage
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+type MessageOptions = { metadata?: unknown; contextId?: unknown; parts?: unknown; extra?: Record<string, unknown> };
+
+const userMessage = (text: string, options: MessageOptions = {}): Record<string, unknown> => ({
+  messageId: "m-1",
+  role: "ROLE_USER",
+  parts: options.parts ?? [{ text }],
+  ...(options.metadata === undefined ? {} : { metadata: options.metadata }),
+  ...(options.contextId === undefined ? {} : { contextId: options.contextId }),
+  ...options.extra,
+});
+
+const say = (text: string, options: MessageOptions = {}, params: Record<string, unknown> = {}): RequestInit =>
+  a2a("SendMessage", { message: userMessage(text, options), ...params });
+
+// The agent's message from a successful SendMessage, with its shape checked.
+const expectMessage = async (response: Response): Promise<Record<string, any>> => {
+  assert.equal(response.status, 200);
+  const body = await rpc(response);
+  assert.equal(body.error, undefined, JSON.stringify(body));
+  assert.equal(body.id, 1);
+  assert.deepEqual(Object.keys(body.result ?? {}), ["message"], "a message, never a task");
+  const message = body.result?.message;
+  assert.equal(message.role, "ROLE_AGENT");
+  assert.match(message.messageId, UUID);
+  assert.equal(typeof message.contextId, "string");
+  assert.equal(message.taskId, undefined);
+  return message;
+};
+
+const EXPECTED: Record<string, unknown> = {
+  "company-profile": { ...COMPANY },
+  services: { services: SERVICES },
+  "contact-options": contactOptions(),
+};
+
+const expectSkill = (message: Record<string, any>, skillId: string): void => {
+  assert.deepEqual(message.metadata, { skillId });
+  assert.equal(message.parts.length, 2);
+  assert.equal(message.parts[0].mediaType, "text/plain");
+  assert.equal(typeof message.parts[0].text, "string");
+  assert.equal(message.parts[1].mediaType, "application/json");
+  assert.deepEqual(message.parts[1].data, EXPECTED[skillId]);
+};
+
+for (const skill of SKILLS) {
+  test(`SendMessage: metadata.skillId ${skill.id} answers that skill with its facts`, async () => {
+    expectSkill(await expectMessage(await send(say("hello", { metadata: { skillId: skill.id } }))), skill.id);
+  });
+
+  test(`SendMessage: request metadata.skillId ${skill.id} answers that skill`, async () => {
+    expectSkill(await expectMessage(await send(say("hello", {}, { metadata: { skillId: skill.id } }))), skill.id);
+  });
+
+  test(`SendMessage: the text "${skill.id}" answers that skill`, async () => {
+    expectSkill(await expectMessage(await send(say(` ${skill.id.toUpperCase()} `))), skill.id);
+  });
+
+  for (const example of skill.examples) {
+    test(`SendMessage: the card example "${example}" routes to ${skill.id}`, async () => {
+      expectSkill(await expectMessage(await send(say(example))), skill.id);
+    });
+  }
+}
+
+test("SendMessage: message metadata wins over request metadata", async () => {
+  const message = await expectMessage(await send(say("hello", { metadata: { skillId: "services" } }, { metadata: { skillId: "contact-options" } })));
+  expectSkill(message, "services");
+});
+
+test("SendMessage: an unknown skillId falls through to the text", async () => {
+  expectSkill(await expectMessage(await send(say("how do I contact you", { metadata: { skillId: "nope" } }))), "contact-options");
+});
+
+test("SendMessage: text parts are joined before the rules run", async () => {
+  const message = await expectMessage(await send(say("", { parts: [{ text: "Do you build" }, { text: "Android apps?", mediaType: "text/plain" }] })));
+  expectSkill(message, "services");
+});
+
+test("SendMessage: the text part is rendered from the same facts as the data", async () => {
+  const profile = await expectMessage(await send(say("company-profile")));
+  assert.equal(profile.parts[0].text, `${COMPANY.name}: ${COMPANY.description} Founded by ${COMPANY.founder}. Website: ${COMPANY.website}`);
+  const services = await expectMessage(await send(say("services")));
+  for (const service of SERVICES) assert.ok(services.parts[0].text.includes(`- ${service.name}: ${service.description}`));
+  const contact = await expectMessage(await send(say("contact-options")));
+  const options = contactOptions() as Record<string, any>;
+  for (const value of [options.form, options.email, options.linkedin, options.x, String(options.formFields.message.maxLength)]) {
+    assert.ok(contact.parts[0].text.includes(value), value);
+  }
+  assert.ok(contact.parts[0].text.endsWith("This agent cannot send a message for you."));
+});
+
+test("SendMessage: text with no keyword gets the help reply listing the skills", async () => {
+  const message = await expectMessage(await send(say("hello")));
+  assert.deepEqual(message.metadata, { skillId: "help" });
+  for (const skill of SKILLS) assert.ok(message.parts[0].text.includes(`- ${skill.id}: ${skill.name}`), skill.id);
+  assert.deepEqual(message.parts[1].data, {
+    skills: SKILLS.map(({ id, name, description }) => ({ id, name, description })),
+  });
+});
+
+test("SendMessage: the reply never repeats the user's text", async () => {
+  const marker = `zq${"x9".repeat(40)}unique`;
+  for (const text of [`<script>alert(1)</script> ${marker}`, `contact <script> ${marker}`, `services ${marker}`]) {
+    const response = await send(say(text));
+    const raw = await response.clone().text();
+    await expectMessage(response);
+    assert.ok(!raw.includes("<script>"), text);
+    assert.ok(!raw.includes(marker), text);
+  }
+});
+
+test("SendMessage: a supplied contextId is returned unchanged", async () => {
+  const message = await expectMessage(await send(say("hello", { contextId: "ctx-1.a:b_c" })));
+  assert.equal(message.contextId, "ctx-1.a:b_c");
+});
+
+test("SendMessage: without a contextId a fresh UUID is used each time", async () => {
+  const first = await expectMessage(await send(say("hello")));
+  const second = await expectMessage(await send(say("hello")));
+  assert.match(first.contextId, UUID);
+  assert.notEqual(first.contextId, second.contextId);
+  assert.notEqual(first.messageId, second.messageId);
+});
+
+for (const contextId of ["", "has space", "x".repeat(129), "<b>", 5]) {
+  test(`SendMessage: contextId ${JSON.stringify(contextId).slice(0, 20)} is -32602`, async () => {
+    await expectError(await send(say("hello", { contextId })), 200, -32602);
+  });
+}
+
+test("SendMessage: acceptedOutputModes text/plain gives only the text part", async () => {
+  const message = await expectMessage(await send(say("services", {}, { configuration: { acceptedOutputModes: ["text/plain"] } })));
+  assert.deepEqual(message.parts.map((part: { mediaType: string }) => part.mediaType), ["text/plain"]);
+});
+
+test("SendMessage: acceptedOutputModes application/json gives only the data part", async () => {
+  const message = await expectMessage(await send(say("services", {}, { configuration: { acceptedOutputModes: ["application/json"] } })));
+  assert.deepEqual(message.parts, [{ data: { services: SERVICES }, mediaType: "application/json" }]);
+});
+
+test("SendMessage: an empty acceptedOutputModes gives both parts", async () => {
+  const message = await expectMessage(await send(say("services", {}, { configuration: { acceptedOutputModes: [] } })));
+  assert.equal(message.parts.length, 2);
+});
+
+test("SendMessage: acceptedOutputModes image/png is -32005", async () => {
+  await expectA2aError(
+    await send(say("services", {}, { configuration: { acceptedOutputModes: ["image/png"] } })),
+    -32005,
+    "CONTENT_TYPE_NOT_SUPPORTED",
+  );
+});
+
+test("SendMessage: returnImmediately and historyLength are accepted and change nothing", async () => {
+  const message = await expectMessage(await send(say("services", {}, { configuration: { returnImmediately: true, historyLength: 5 } })));
+  expectSkill(message, "services");
+});
+
+// SendMessage refusals
+
+const INVALID: readonly (readonly [string, Record<string, unknown>])[] = [
+  ["no message", {}],
+  ["a message that is not an object", { message: "hi" }],
+  ["role ROLE_AGENT", { message: { ...userMessage("hi"), role: "ROLE_AGENT" } }],
+  ["no role", { message: { messageId: "m-1", parts: [{ text: "hi" }] } }],
+  ["no messageId", { message: { role: "ROLE_USER", parts: [{ text: "hi" }] } }],
+  ["an empty messageId", { message: { ...userMessage("hi"), messageId: "" } }],
+  ["a 129-character messageId", { message: { ...userMessage("hi"), messageId: "m".repeat(129) } }],
+  ["no parts", { message: { messageId: "m-1", role: "ROLE_USER" } }],
+  ["empty parts", { message: userMessage("hi", { parts: [] }) }],
+  ["17 parts", { message: userMessage("hi", { parts: Array.from({ length: 17 }, () => ({ text: "hi" })) }) }],
+  ["a part with text and data", { message: userMessage("hi", { parts: [{ text: "hi", data: {} }] }) }],
+  ["a part with no content", { message: userMessage("hi", { parts: [{ mediaType: "text/plain" }] }) }],
+  ["a part that is not an object", { message: userMessage("hi", { parts: ["hi"] }) }],
+  ["a text part that is not a string", { message: userMessage("hi", { parts: [{ text: 5 }] }) }],
+  ["a non-empty tenant", { message: userMessage("hi"), tenant: "acme" }],
+  ["a configuration that is not an object", { message: userMessage("hi"), configuration: "x" }],
+  ["acceptedOutputModes that is not an array", { message: userMessage("hi"), configuration: { acceptedOutputModes: "text/plain" } }],
+];
+
+for (const [label, params] of INVALID) {
+  test(`SendMessage: ${label} is -32602`, async () => {
+    const body = await expectError(await send(a2a("SendMessage", params)), 200, -32602);
+    assert.equal(body.error?.data, undefined);
+  });
+}
+
+for (const [label, part] of [
+  ["a data part", { data: { q: 1 } }],
+  ["a url part", { url: "https://example.com/a.txt" }],
+  ["a raw part", { raw: "aGk=" }],
+  ["a text part of another media type", { text: "hi", mediaType: "text/html" }],
+] as const) {
+  test(`SendMessage: ${label} is -32005`, async () => {
+    await expectA2aError(await send(say("", { parts: [{ text: "hi" }, part] })), -32005, "CONTENT_TYPE_NOT_SUPPORTED");
+  });
+}
+
+test("SendMessage: a taskId is -32001, since no task exists", async () => {
+  await expectA2aError(await send(say("hi", { extra: { taskId: "task-1" } })), -32001, "TASK_NOT_FOUND");
+});
+
+for (const key of ["taskPushNotificationConfig", "pushNotificationConfig"]) {
+  test(`SendMessage: configuration.${key} is -32003`, async () => {
+    await expectA2aError(
+      await send(say("hi", {}, { configuration: { [key]: { url: "https://example.com/hook" } } })),
+      -32003,
+      "PUSH_NOTIFICATION_NOT_SUPPORTED",
+    );
+  });
+}
 
 // Methods other than SendMessage
 
