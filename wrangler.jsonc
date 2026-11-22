@@ -48,7 +48,7 @@
     // "/?sent=1" and "/?utm_source=x" run the Worker like "/".
     //   /, /privacy.html   Link headers, and markdown for Accept: text/markdown
     //   /mcp               the MCP server; "/mcp/server-card" is a file
-  //   /a2a               the A2A agent; its card is a file
+    //   /a2a               the A2A agent; its card is a file
     //   /api/v1 ...        the JSON API: rate limited, and /status needs a clock
     // Every request that matches a pattern here is a Worker request. Do not
     // add a pattern that matches a static file.
