@@ -310,6 +310,30 @@ test("SendMessage: an empty acceptedOutputModes gives both parts", async () => {
   assert.equal(message.parts.length, 2);
 });
 
+const modesOf = async (accepted: unknown[]): Promise<string[]> => {
+  const message = await expectMessage(await send(say("services", {}, { configuration: { acceptedOutputModes: accepted } })));
+  return message.parts.map((part: { mediaType: string }) => part.mediaType);
+};
+
+test("SendMessage: acceptedOutputModes */* gives both parts", async () => {
+  assert.deepEqual(await modesOf(["*/*"]), ["text/plain", "application/json"]);
+});
+
+test("SendMessage: acceptedOutputModes text/* gives only the text part; application/* only the data part", async () => {
+  assert.deepEqual(await modesOf(["text/*"]), ["text/plain"]);
+  assert.deepEqual(await modesOf(["Application/*"]), ["application/json"]);
+});
+
+test("SendMessage: wildcards that match neither part are still -32005", async () => {
+  for (const accepted of [["image/*"], ["text/html", "image/*"], ["*/plain"]]) {
+    await expectA2aError(
+      await send(say("services", {}, { configuration: { acceptedOutputModes: accepted } })),
+      -32005,
+      "CONTENT_TYPE_NOT_SUPPORTED",
+    );
+  }
+});
+
 test("SendMessage: acceptedOutputModes image/png is -32005", async () => {
   await expectA2aError(
     await send(say("services", {}, { configuration: { acceptedOutputModes: ["image/png"] } })),

@@ -174,11 +174,15 @@ function supportedVersion(request: Request): boolean {
 
 // The SendMessageResponse: always a direct message, never a task. Only the
 // parts whose media type the client accepts; null when none is left.
+// "*/*" and "type/*" are read as HTTP Accept reads them.
+const accepts = (modes: readonly string[], type: string): boolean =>
+  modes.some((mode) => mode === type || mode === "*/*" || (mode.endsWith("/*") && type.startsWith(mode.slice(0, -1))));
+
 function buildReply(skillId: string, answer: Answer, contextId: string, modes: readonly string[]): Record<string, unknown> | null {
   const parts = [
     { text: answer.text, mediaType: "text/plain" },
     { data: answer.data, mediaType: "application/json" },
-  ].filter((part) => modes.includes(part.mediaType));
+  ].filter((part) => accepts(modes, part.mediaType));
   if (parts.length === 0) return null;
   return {
     message: { messageId: crypto.randomUUID(), contextId, role: "ROLE_AGENT", parts, metadata: { skillId } },
