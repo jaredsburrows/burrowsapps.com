@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
+import { gunzipSync } from "node:zlib";
 import { assetsIgnore, PUBLISHED_FILES, publishedFolders } from "./support/published-files.ts";
 import {
   assetFetch,
@@ -169,3 +170,62 @@ test("files are typed by extension as Cloudflare infers it", async () => {
   assert.equal((await get("/sitemap.xml")).headers.get("Content-Type"), "application/xml");
 });
 
+
+// Answers measured under wrangler dev, replayed against the emulated site.
+
+test("other methods on the two pages reach the binding and get its 405", async () => {
+  for (const [method, path] of [["OPTIONS", "/"], ["POST", "/"], ["PUT", "/"], ["OPTIONS", "/privacy.html"], ["DELETE", "/privacy.html"]]) {
+    const response = await get(path, { method });
+    assert.equal(response.status, 405, `${method} ${path}`);
+    assert.equal(await response.text(), "", `${method} ${path}`);
+  }
+});
+
+test("OPTIONS on the MCP server and the API is the Worker's preflight", async () => {
+  for (const path of ["/mcp", "/api/v1/company"]) {
+    const response = await get(path, { method: "OPTIONS" });
+    assert.equal(response.status, 204, path);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*", path);
+  }
+});
+
+test("paths are case-sensitive", async () => {
+  for (const path of ["/ROBOTS.TXT", "/Index.md", "/readme.md", "/Static/css/home.css"]) {
+    assert.equal((await get(path)).status, 404, path);
+  }
+});
+
+test("the asset router's redirects keep the query string", async () => {
+  for (const [path, location] of [["/privacy/", "/privacy"], ["/index.html?q=1", "/?q=1"], ["//", "/"], ["/404.html", "/404"]]) {
+    const response = await get(path);
+    assert.equal(response.status, 307, path);
+    assert.equal(response.headers.get("Location"), location, path);
+  }
+});
+
+test("a folder is not a page", async () => {
+  for (const path of ["/static", "/static/", "/.well-known/", "/mcp/"]) assert.equal((await get(path)).status, 404, path);
+});
+
+test("the 404 page carries the headers of the /* rule", async () => {
+  const response = await get("/nope");
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff");
+});
+
+test("the two pages carry nosniff from the /* rule through the binding", async () => {
+  for (const path of ["/", "/privacy.html"]) {
+    const response = await get(path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("X-Content-Type-Options"), "nosniff", path);
+  }
+});
+
+test("with Accept-Encoding gzip the page is compressed and Vary still names only Accept", async () => {
+  const response = await get("/", { headers: { "Accept-Encoding": "gzip, br" } });
+  assert.equal(response.headers.get("Content-Encoding"), "gzip");
+  assert.equal(response.headers.get("Vary"), "Accept");
+  const body = gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8");
+  assert.equal(body, readFileSync(new URL("index.html", REPO), "utf8"));
+});
