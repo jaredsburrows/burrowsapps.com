@@ -85,7 +85,7 @@
   const send = async () => {
     const token = turnstileToken();
     if (!token) {
-      setStatus('error', 'Please wait for the security check above the button to finish, then send again.');
+      setStatus('error', 'Please wait a moment for the security check to finish, then send again.');
       return false;
     }
     sending = true;

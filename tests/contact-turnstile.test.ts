@@ -153,6 +153,8 @@ test("the form's widget uses the action and the script that the Worker expects",
   assert.match(widget, /\bid="cf-turnstile"/);
   assert.match(widget, /\bdata-sitekey="0x[0-9A-Za-z_-]+"/);
   assert.ok(widget.includes(`data-action="${action}"`), "the widget's data-action does not match the Worker");
+  // Hidden unless Cloudflare needs the visitor to interact, as on the-cigar-guys.
+  assert.match(widget, /\bdata-appearance="interaction-only"/);
   assert.ok(form.indexOf(widget) < form.indexOf('id="cf-submit"'), "the widget is not above the submit button");
   assert.match(html, /<script src="https:\/\/challenges\.cloudflare\.com\/turnstile\/v0\/api\.js" async defer><\/script>/);
 });
