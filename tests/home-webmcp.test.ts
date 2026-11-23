@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ENDPOINT, createFakeDom, plain } from "./support/fake-dom.ts";
+import { ENDPOINT, TURNSTILE_TOKEN, createFakeDom, plain } from "./support/fake-dom.ts";
 import type { FakeDom } from "./support/fake-dom.ts";
 
 const VALID = { name: "Ada Lovelace", email: "ada@example.com", message: "I would like an Android app." };
@@ -19,7 +19,7 @@ const assertContactPost = (dom: FakeDom): void => {
   assert.equal(call.url, ENDPOINT);
   assert.equal(call.init.method, "POST");
   assert.deepEqual(plain(call.init.headers), { "Content-Type": "application/json" });
-  assert.deepEqual(JSON.parse(call.init.body), { ...VALID, company: "" });
+  assert.deepEqual(JSON.parse(call.init.body), { ...VALID, company: "", "cf-turnstile-response": TURNSTILE_TOKEN });
 };
 
 test("the human submit path posts the form as JSON and shows the success status", async () => {
@@ -387,4 +387,76 @@ test("a human submit of whitespace-only fields still posts, as it did before the
   dom.fields.message.value = "\n\n";
   await dom.submitForm();
   assert.equal(dom.fetchCalls.length, 1);
+});
+
+// Cloudflare Turnstile. Tokens are single-use, so every send carries the
+// widget's current token and every send attempt resets the widget.
+const tokenSent = (dom: FakeDom, index: number): unknown =>
+  JSON.parse(dom.fetchCalls[index].init.body)["cf-turnstile-response"];
+
+test("each send carries the current Turnstile token and resets the widget after it", async () => {
+  const dom = createFakeDom();
+  dom.run();
+  fillValid(dom);
+  await dom.submitForm();
+  assert.equal(tokenSent(dom, 0), TURNSTILE_TOKEN);
+  assert.deepEqual(plain(dom.turnstileResets), ["#cf-turnstile"]);
+  fillValid(dom);
+  await dom.submitForm();
+  assert.equal(tokenSent(dom, 1), `${TURNSTILE_TOKEN}-1`, "a used token was sent again");
+  assert.equal(dom.turnstileResets.length, 2);
+});
+
+for (const behavior of ["not-ok", "reject"] as const) {
+  test(`a failed send (${behavior}) still resets the widget, so a retry gets a fresh token`, async () => {
+    const dom = createFakeDom();
+    dom.run();
+    fillValid(dom);
+    dom.fetchBehavior = behavior;
+    await dom.submitForm();
+    assert.equal(dom.status.className, "form-status error");
+    assert.deepEqual(plain(dom.turnstileResets), ["#cf-turnstile"]);
+    dom.fetchBehavior = "ok";
+    await dom.submitForm();
+    assert.equal(tokenSent(dom, 1), `${TURNSTILE_TOKEN}-1`);
+    assert.equal(dom.status.className, "form-status ok");
+  });
+}
+
+test("a human submit before the Turnstile check finishes sends nothing and says to wait", async () => {
+  const dom = createFakeDom();
+  dom.run();
+  fillValid(dom);
+  dom.turnstileField.value = "";
+  await dom.submitForm();
+  assert.equal(dom.fetchCalls.length, 0);
+  assert.equal(dom.status.className, "form-status error");
+  assert.match(dom.status.innerHTML, /security check/);
+  assert.equal(dom.submit.disabled, false);
+  assert.equal(dom.submit.textContent, "Send message");
+  assert.equal(dom.form.resets, 0, "the visitor's message was cleared");
+  dom.turnstileField.value = TURNSTILE_TOKEN;
+  await dom.submitForm();
+  assertContactPost(dom);
+});
+
+test("execute before the Turnstile check finishes reports failed and sends nothing", async () => {
+  const { dom, tool } = registeredTool();
+  dom.turnstileField.value = "";
+  const result = plain(await tool.execute({ ...VALID }));
+  assert.equal(result.status, "failed");
+  assert.match(String(result.message), /security check/);
+  assert.equal(dom.fetchCalls.length, 0);
+  dom.turnstileField.value = TURNSTILE_TOKEN;
+  assert.equal(plain(await tool.execute({ ...VALID })).status, "sent");
+});
+
+test("a send works when window.turnstile is missing and does not throw on reset", async () => {
+  const dom = createFakeDom({ turnstileLoaded: false });
+  dom.run();
+  fillValid(dom);
+  await dom.submitForm();
+  assertContactPost(dom);
+  assert.equal(dom.status.className, "form-status ok");
+  assert.equal(dom.turnstileResets.length, 0);
 });

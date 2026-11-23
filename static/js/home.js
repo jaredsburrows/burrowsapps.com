@@ -65,8 +65,29 @@
   // submit; this also stops the WebMCP tool, which never clicks the button.
   let sending = false;
 
+  // Cloudflare Turnstile renders into #cf-turnstile and keeps its token in a
+  // hidden cf-turnstile-response field inside the form. Tokens are single-use,
+  // so the widget is reset after every send attempt to get a fresh one.
+  const TURNSTILE_WIDGET = '#cf-turnstile';
+  const turnstileToken = () => {
+    const field = form.elements['cf-turnstile-response'];
+    return field && typeof field.value === 'string' ? field.value : '';
+  };
+  const resetTurnstile = () => {
+    try {
+      if (window.turnstile) window.turnstile.reset(TURNSTILE_WIDGET);
+    } catch {
+      // The widget is gone or never rendered; the next send reports it.
+    }
+  };
+
   // Shared by the human submit handler and the WebMCP tool below.
   const send = async () => {
+    const token = turnstileToken();
+    if (!token) {
+      setStatus('error', 'Please wait for the security check above the button to finish, then send again.');
+      return false;
+    }
     sending = true;
     submit.disabled = true;
     submit.textContent = 'Sending…';
@@ -83,11 +104,13 @@
         email: form.email.value.trim(),
         message: form.message.value.trim(),
         company: form.company.value,
+        'cf-turnstile-response': token,
       }),
       signal: controller.signal,
     }).catch(() => null);
 
     clearTimeout(timer);
+    resetTurnstile();
     const sent = Boolean(response && response.ok);
     if (sent) {
       form.reset();
@@ -139,6 +162,12 @@
     }
     if (!valid || Object.keys(errors).length > 0) {
       return { status: 'invalid', message: 'The message was not sent. Fix the listed fields and try again.', errors };
+    }
+    if (!turnstileToken()) {
+      return {
+        status: 'failed',
+        message: 'The security check on the page has not finished. Wait a few seconds, then try again.',
+      };
     }
     return (await send())
       ? { status: 'sent', message: 'Message sent. Burrows Applications will reply to the email address provided.' }

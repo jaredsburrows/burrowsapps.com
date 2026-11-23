@@ -5,6 +5,8 @@ import { runInNewContext } from "node:vm";
 
 export const HOME_JS = readFileSync(new URL("../../static/js/home.js", import.meta.url), "utf8");
 export const ENDPOINT = "https://burrowsapps.com/api/contact";
+// What the fake Turnstile widget puts in its hidden field until a test changes it.
+export const TURNSTILE_TOKEN = "fake-turnstile-token";
 
 // The pattern attribute on #cf-email in index.html. Browsers anchor it and
 // match the whole value.
@@ -47,6 +49,8 @@ export type FetchBehavior = "ok" | "not-ok" | "reject";
 export type FakeDomOptions = {
   documentModelContext?: unknown;
   navigatorModelContext?: unknown;
+  // false leaves window.turnstile undefined, as before api.js has loaded.
+  turnstileLoaded?: boolean;
 };
 
 export type FakeDom = {
@@ -58,6 +62,10 @@ export type FakeDom = {
     resets: number;
   };
   fields: Record<"name" | "email" | "message" | "company", FakeField>;
+  // The hidden field the Turnstile widget renders into the form.
+  turnstileField: { name: string; value: string };
+  // Containers passed to window.turnstile.reset, in call order.
+  turnstileResets: unknown[];
   submit: FakeElement;
   status: FakeElement;
   errors: Record<string, FakeElement>;
@@ -126,10 +134,12 @@ export function createFakeDom(options: FakeDomOptions = {}): FakeDom {
     "cf-message-error": createElement("cf-message-error"),
   };
 
+  const turnstileField = { name: "cf-turnstile-response", value: TURNSTILE_TOKEN };
+
   const form = {
     action: ENDPOINT,
     noValidate: false,
-    elements: { ...fields } as Record<string, FakeField>,
+    elements: { ...fields, "cf-turnstile-response": turnstileField } as unknown as Record<string, FakeField>,
     submitListeners: [] as Listener[],
     resets: 0,
     ...fields,
@@ -156,6 +166,8 @@ export function createFakeDom(options: FakeDomOptions = {}): FakeDom {
     submit,
     status,
     errors,
+    turnstileField,
+    turnstileResets: [],
     fetchCalls: [],
     fetchBehavior: "ok",
     fetchGate: null,
@@ -174,7 +186,18 @@ export function createFakeDom(options: FakeDomOptions = {}): FakeDom {
         if (dom.fetchBehavior === "reject") throw new TypeError("Failed to fetch");
         return { ok: dom.fetchBehavior === "ok" };
       };
-      runInNewContext(HOME_JS, { document, navigator, fetch, AbortController, setTimeout, clearTimeout });
+      const window: Record<string, unknown> = {};
+      if (options.turnstileLoaded !== false) {
+        window.turnstile = {
+          // A reset throws the used token away and the managed widget solves a
+          // new one straight after; the fake does both at once.
+          reset(container: unknown) {
+            dom.turnstileResets.push(container);
+            turnstileField.value = `${TURNSTILE_TOKEN}-${dom.turnstileResets.length}`;
+          },
+        };
+      }
+      runInNewContext(HOME_JS, { window, document, navigator, fetch, AbortController, setTimeout, clearTimeout });
     },
     async submitForm() {
       for (const listener of form.submitListeners) await listener({ preventDefault() {} });

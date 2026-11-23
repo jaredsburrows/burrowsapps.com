@@ -26,6 +26,9 @@ const MAX_EMAIL = 254;
 const MAX_MESSAGE = 5000;
 const MAX_TURNSTILE_TOKEN = 2048;
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+// The data-action on the form's widget in index.html. A token minted for any
+// other action (another widget, another page) is rejected.
+const TURNSTILE_ACTION = "contact";
 const EMAIL_RE =
   /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 
@@ -74,7 +77,10 @@ async function verifyTurnstile(env, token, ip) {
         return outcome.success === true;
       }
       const hostnames = ALLOWED_ORIGINS.map((o) => new URL(o).hostname);
-      const ok = outcome.success === true && hostnames.includes(outcome.hostname);
+      const ok =
+        outcome.success === true &&
+        outcome.action === TURNSTILE_ACTION &&
+        hostnames.includes(outcome.hostname);
       if (!ok) console.error("turnstile rejected:", JSON.stringify(outcome));
       return ok;
     } catch (e) {

@@ -163,6 +163,10 @@
             <label for="cf-company">Company</label>
             <input id="cf-company" name="company" type="text" tabindex="-1" autocomplete="off">
           </div>
+          <!-- Cloudflare Turnstile. The widget adds a hidden cf-turnstile-response
+               field to this form; the contact Worker verifies it (action "contact"). -->
+          <div class="cf-turnstile" id="cf-turnstile" data-sitekey="0x4AAAAAAGPZpbyrFCcl6Qca"
+               data-action="contact" data-size="flexible"></div>
           <button type="submit" id="cf-submit">Send message</button>
           <p class="form-status" id="cf-status" role="status" aria-live="polite"></p>
         </form>
@@ -185,6 +189,7 @@
     </div>
   </footer>
 
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="/static/js/home.js"></script>
 </body>
 </html>
