@@ -57,6 +57,28 @@ function cleanMessage(value) {
   return String(value ?? "").replace(/[^\P{Cc}\n\t]/gu, "").trim();
 }
 
+const REGIONAL_INDICATOR_A = 0x1f1e6;
+
+// Cloudflare's two-letter country code (request.cf.country) shifted into the
+// Unicode regional-indicator range: "US" becomes U+1F1FA U+1F1F8, which renders
+// as the US flag. No lookup table. Anything that is not exactly two letters
+// renders nothing, and so does "XX" (Cloudflare's "unknown"); "T1" (Tor) fails
+// the shape check on its own.
+function countryFlag(code) {
+  if (typeof code !== "string" || !/^[A-Za-z]{2}$/.test(code)) return null;
+  const upper = code.toUpperCase();
+  if (upper === "XX") return null;
+  return [...upper]
+    .map((letter) => String.fromCodePoint(REGIONAL_INDICATOR_A + letter.charCodeAt(0) - 65))
+    .join("");
+}
+
+// " 🇺🇸 US" after the IP address, or nothing when there is no usable country.
+function countrySuffix(code) {
+  const flag = countryFlag(code);
+  return flag ? ` ${flag} ${code.toUpperCase()}` : "";
+}
+
 async function verifyTurnstile(env, token, ip) {
   const idempotencyKey = crypto.randomUUID();
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -205,7 +227,7 @@ Message:
 ${message}
 
 \u2014 Sent automatically by the contact form at https://burrowsapps.com
-  Submitted from IP address ${ip}
+  Submitted from IP address ${ip}${countrySuffix(request.cf?.country)}
 `,
     });
   } catch (e) {
