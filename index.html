@@ -164,9 +164,11 @@
             <input id="cf-company" name="company" type="text" tabindex="-1" autocomplete="off">
           </div>
           <!-- Cloudflare Turnstile. The widget adds a hidden cf-turnstile-response
-               field to this form; the contact Worker verifies it (action "contact"). -->
+               field to this form; the contact Worker verifies it (action "contact").
+               interaction-only: the widget stays invisible, and takes no space,
+               unless Cloudflare needs the visitor to click it. -->
           <div class="cf-turnstile" id="cf-turnstile" data-sitekey="0x4AAAAAAGPZpbyrFCcl6Qca"
-               data-action="contact" data-size="flexible"></div>
+               data-action="contact" data-size="flexible" data-appearance="interaction-only"></div>
           <button type="submit" id="cf-submit">Send message</button>
           <p class="form-status" id="cf-status" role="status" aria-live="polite"></p>
         </form>
