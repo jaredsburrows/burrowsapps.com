@@ -93,7 +93,7 @@ Every other path is a file and costs no Worker request. A path with no file gets
 
 Workers Free allows 100,000 Worker requests a day per account, shared with the contact Worker. Files do not count. Over the limit, files are still served, and `/`, `/privacy.html`, `/mcp`, `/a2a`, and `/api/v1` answer `429` until the daily reset.
 
-Until GitHub Pages is switched off, an uncaught error in the Worker falls back to it.
+There is no origin behind the Worker: GitHub Pages is switched off, so an uncaught error is an error page, not a fallback copy of the site.
 
 #### Deploy
 
@@ -110,9 +110,9 @@ npx wrangler rollback <version-id>
 
 #### Cloudflare settings outside this repository
 
-- Workers Routes: `burrowsapps.com/*` on the Worker `burrowsapps-com`. It is not in `wrangler.jsonc`, so a deploy never changes it and the deploy token needs no zone permission. The contact Worker's routes, `burrowsapps.com/api/contact*` and `www.burrowsapps.com/api/contact*`, are more specific and win.
+- Custom Domain: `burrowsapps.com` on the Worker `burrowsapps-com` (DNS lists it as a `Worker` record). It is not in `wrangler.jsonc`, so a deploy never changes it and the deploy token needs no zone permission. The contact Worker's routes, `burrowsapps.com/api/contact*` and `www.burrowsapps.com/api/contact*`, still answer those paths: checked 2026-11-27, `OPTIONS /api/contact` gets the contact Worker's `204` with `Access-Control-Allow-Methods: POST, OPTIONS`.
 - Redirect Rule for `www`: filter `(http.host eq "www.burrowsapps.com" and not starts_with(http.request.uri.path, "/api/contact"))`, dynamic target `concat("https://burrowsapps.com", http.request.uri.path)`, status `301`, query string preserved.
-- Apex DNS: until the move is verified, the apex keeps its GitHub Pages `A` and `AAAA` records, proxied. They are then replaced by one proxied placeholder, `AAAA` `@` `100::`, added before the old records are deleted. The apex records move off GitHub before GitHub Pages is switched off, never the other way around: a GitHub-pointing record with Pages off lets anyone claim the name on their own Pages site. The `www` record is a proxied CNAME to the apex, not to GitHub, and stays.
+- Apex DNS: no `A` or `AAAA` records and none pointing at GitHub; the Custom Domain owns the apex. The `www` record is a proxied CNAME to the apex. GitHub Pages is switched off for this repository. Keep the `_github-pages-challenge` TXT record: it keeps `burrowsapps.com` verified to the GitHub account, so no one else can claim the name on their own Pages site. Never add a DNS record that points at GitHub.
 - The DNS-AID record below.
 
 #### DNS records
