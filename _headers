@@ -1,23 +1,55 @@
 # Read by Cloudflare at deploy time and not served. It applies to static
 # files, including the two pages the Worker reads through its ASSETS binding
-# (/ and /privacy.html get the /* rule). Responses the Worker builds itself
+# (/ and /privacy.html get the /* rule and their Content-Type rule). Responses the Worker builds itself
 # (/mcp, /a2a, /api/v1, the markdown variants) set their own headers in code.
 #
 # When several rules match one URL, their values for the same header are joined
 # with a comma. So a header set under /* must not be set again further down,
 # and no two rules below may match the same URL.
 
-# What GitHub Pages sent on every file, plus nosniff.
+# What GitHub Pages sent on every file, plus nosniff and the browser security
+# headers. Every file gets them, so a page served from any path has them.
+#   Referrer-Policy     only the origin goes to other sites, never the path
+#   X-Frame-Options     no site may frame these pages (clickjacking)
+#   Permissions-Policy  the pages use none of these features; Turnstile needs
+#                       none of them either
+#   COOP                a window this site opens, or that opens it, gets no
+#                       handle to it. Nothing here uses window.opener.
+# Cross-Origin-Embedder-Policy is deliberately not set: require-corp would
+# block Google Analytics and the Turnstile iframe, which send no CORP header.
 /*
   Access-Control-Allow-Origin: *
   X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# The pages. In production the asset router sends a bare "text/html" (and
+# "text/css", "text/javascript"): no charset, so the browser falls back to the
+# <meta charset> in each file. Stated here so the header carries it too.
+# "/" and "/privacy" are what the Worker reads through its binding for "/" and
+# "/privacy.html", so these rules reach both pages. A path with no file gets
+# 404.html under its own path, which no exact rule can name; that page has its
+# <meta charset> in its first line of <head>.
+/
+  Content-Type: text/html; charset=utf-8
+
+/privacy
+  Content-Type: text/html; charset=utf-8
+
+/404
+  Content-Type: text/html; charset=utf-8
 
 # Without these every file is revalidated on every view. URLs are not
-# versioned, so code gets an hour and images a month.
+# versioned, so code gets an hour and images a month. Both files contain
+# non-ASCII characters, so the charset is stated as well.
 /static/css/*
+  Content-Type: text/css; charset=utf-8
   Cache-Control: public, max-age=3600
 
 /static/js/*
+  Content-Type: text/javascript; charset=utf-8
   Cache-Control: public, max-age=3600
 
 /static/img/*
@@ -26,8 +58,8 @@
 /favicon.ico
   Cache-Control: public, max-age=2592000
 
-# Markdown. Cloudflare infers the same type; stated here so it cannot change,
-# because the files contain non-ASCII punctuation.
+# Markdown. Cloudflare infers the type without a charset; stated here because
+# the files contain non-ASCII punctuation.
 /index.md
   Content-Type: text/markdown; charset=utf-8
 
