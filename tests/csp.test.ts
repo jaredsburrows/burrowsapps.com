@@ -30,6 +30,9 @@ function policy(): Map<string, string[]> {
   return directives;
 }
 
+// Exact match against the directive's list of sources, never a substring.
+const allows = (name: string, source: string): boolean => directive(name).some((candidate) => candidate === source);
+
 const directive = (name: string): string[] => {
   const sources = policy().get(name);
   assert.ok(sources, `no ${name}`);
@@ -40,7 +43,9 @@ type Script = { attributes: string; body: string };
 
 function scripts(file: string): Script[] {
   const html = readFileSync(new URL(file, REPO), "utf8");
-  return [...html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)].map((match) => ({ attributes: match[1] ?? "", body: match[2] }));
+  // Case-insensitive, and the end tag may carry spaces or junk before ">", as
+  // browsers accept, so no script on a page can escape the hash checks.
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script[^>]*>/gi)].map((match) => ({ attributes: match[1], body: match[2] }));
 }
 
 // A data block such as JSON-LD is never run, so CSP does not apply to it.
@@ -106,8 +111,8 @@ test("every inline style attribute is allowed by its hash", () => {
 });
 
 test("the Turnstile widget may load and render, and the form posts to this site", () => {
-  assert.ok(directive("script-src").includes("https://challenges.cloudflare.com"));
-  assert.ok(directive("frame-src").includes("https://challenges.cloudflare.com"));
+  assert.ok(allows("script-src", "https://challenges.cloudflare.com"));
+  assert.ok(allows("frame-src", "https://challenges.cloudflare.com"));
   const html = readFileSync(new URL("index.html", REPO), "utf8");
   const action = /<form[^>]*\saction="([^"]+)"/.exec(html)?.[1];
   assert.ok(action, "no form action");
