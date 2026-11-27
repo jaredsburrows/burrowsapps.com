@@ -105,8 +105,10 @@ test("every _headers rule with an exact path names a published file", async () =
 
 test("the two pages get no cache lifetime, Link, or Vary from _headers", async () => {
   for (const path of ["/", "/index.html", "/privacy", "/privacy.html"]) {
-    const matching = headerRules().filter((rule) => ruleMatches(rule.pattern, path)).map((rule) => rule.pattern);
-    assert.deepEqual(matching, ["/*"], `${path} matches ${matching.join(", ")}`);
+    const extra = headerRules().filter((rule) => rule.pattern !== "/*" && ruleMatches(rule.pattern, path));
+    for (const rule of extra) {
+      assert.deepEqual(rule.headers.map(([name]) => name), ["Content-Type"], `${rule.pattern} sets more than Content-Type`);
+    }
     const headers = headersFor(path);
     for (const name of ["Cache-Control", "CDN-Cache-Control", "Expires", "Link", "Vary"]) {
       assert.equal(headers.get(name), null, `${path} gets ${name}`);
@@ -166,7 +168,7 @@ test("a method other than GET or HEAD on a file is a 405 from the asset router",
 
 test("files are typed by extension as Cloudflare infers it", async () => {
   assert.equal((await get("/favicon.ico")).headers.get("Content-Type"), "image/vnd.microsoft.icon");
-  assert.equal((await get("/robots.txt")).headers.get("Content-Type"), "text/plain; charset=utf-8");
+  assert.equal((await get("/robots.txt")).headers.get("Content-Type"), "text/plain");
   assert.equal((await get("/sitemap.xml")).headers.get("Content-Type"), "application/xml");
 });
 
@@ -228,4 +230,47 @@ test("with Accept-Encoding gzip the page is compressed and Vary still names only
   assert.equal(response.headers.get("Vary"), "Accept");
   const body = gunzipSync(Buffer.from(await response.arrayBuffer())).toString("utf8");
   assert.equal(body, readFileSync(new URL("index.html", REPO), "utf8"));
+});
+
+// SecScanner (secscanner.app) flagged these as missing on 2026-11-27.
+const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-Frame-Options": "DENY",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
+test("the pages, the 404 page, and static files carry the browser security headers", async () => {
+  for (const path of ["/", "/privacy.html", "/privacy", "/404", "/nope", "/static/js/home.js", "/robots.txt", "/.well-known/ai-catalog.json"]) {
+    const response = await get(path, { headers: { "Sec-Fetch-Mode": "navigate" } });
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      assert.equal(response.headers.get(name), value, `${path} ${name}`);
+    }
+  }
+});
+
+test("Cross-Origin-Embedder-Policy is not set: it would block Analytics and Turnstile", async () => {
+  for (const rule of headerRules()) {
+    for (const [name] of rule.headers) assert.notEqual(name.toLowerCase(), "cross-origin-embedder-policy", rule.pattern);
+  }
+});
+
+test("the pages are served as HTML with a UTF-8 charset", async () => {
+  for (const path of ["/", "/privacy.html", "/privacy", "/404"]) {
+    const response = await get(path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers.get("Content-Type"), "text/html; charset=utf-8", path);
+  }
+});
+
+test("every HTML page declares <meta charset> first in <head>, for the 404 page no rule can reach", async () => {
+  for (const file of ["index.html", "privacy.html", "404.html"]) {
+    const html = readFileSync(new URL(file, REPO), "utf8");
+    assert.match(html, /<head>\s*<meta charset="utf-8">/, file);
+  }
+});
+
+test("styles and scripts are served with a UTF-8 charset", async () => {
+  assert.equal((await get("/static/css/home.css")).headers.get("Content-Type"), "text/css; charset=utf-8");
+  assert.equal((await get("/static/js/home.js")).headers.get("Content-Type"), "text/javascript; charset=utf-8");
 });

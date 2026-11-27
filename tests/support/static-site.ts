@@ -157,17 +157,19 @@ export function headersFor(pathname: string): Headers {
   return headers;
 }
 
-// The type Cloudflare infers from each extension, as measured under wrangler
-// dev. Extensionless files get no type here, so they are usable only through
-// a Content-Type rule in _headers.
+// The type Cloudflare infers from each extension, as measured on
+// burrowsapps.com in production (2026-11-27). wrangler dev adds
+// "; charset=utf-8" to the text types; production does not, so a charset the
+// site needs comes from a Content-Type rule in _headers. Extensionless files
+// get no type here, so they are usable only through such a rule too.
 const TYPES: Readonly<Record<string, string>> = {
-  ".html": "text/html; charset=utf-8",
-  ".md": "text/markdown; charset=utf-8",
+  ".html": "text/html",
+  ".md": "text/markdown",
   ".json": "application/json",
-  ".txt": "text/plain; charset=utf-8",
+  ".txt": "text/plain",
   ".xml": "application/xml",
-  ".css": "text/css; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css",
+  ".js": "text/javascript",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".ico": "image/vnd.microsoft.icon",
