@@ -17,6 +17,19 @@
 #                       handle to it. Nothing here uses window.opener.
 # Cross-Origin-Embedder-Policy is deliberately not set: require-corp would
 # block Google Analytics and the Turnstile iframe, which send no CORP header.
+#
+# Content-Security-Policy, one line because _headers has no continuation:
+#   script-src   this site; the two inline Google scripts in <head>, by hash
+#                (identical in index.html, privacy.html and 404.html;
+#                tests/csp.test.ts fails if one changes and its hash here does
+#                not); gtag.js and gtm.js; and Turnstile's api.js. The GTM
+#                container has no tags, so it injects nothing else.
+#   style-src    this site, plus the style attribute on the <noscript> GTM
+#                iframe, by hash
+#   img-src,     where Google Analytics sends hits, including the Google
+#   connect-src  signals endpoints, per Google's CSP guide for GA4
+#   frame-src    the Turnstile widget, and the <noscript> GTM iframe
+#   frame-ancestors 'none' is the modern form of X-Frame-Options: DENY.
 /*
   Access-Control-Allow-Origin: *
   X-Content-Type-Options: nosniff
@@ -24,6 +37,7 @@
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-9DQ65YRPbIVBCGUpoJsg5I6gFiU6zARAGqyEOk4j2ZA=' 'sha256-M+tdapiSSVJwzAkTR7nHcm6tIhiKAOB/MtpHtqGMkts=' https://www.googletagmanager.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-hashes' 'sha256-kELgoK46JmGjLd8UHfzN0qJToDgIB+yMtRHG8PtGL7s='; img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com https://*.g.doubleclick.net https://*.google.com; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://*.google.com; frame-src https://challenges.cloudflare.com https://www.googletagmanager.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
 
 # The pages. In production the asset router sends a bare "text/html" (and
 # "text/css", "text/javascript"): no charset, so the browser falls back to the
