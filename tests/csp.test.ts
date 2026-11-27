@@ -128,6 +128,14 @@ test("Google Analytics may send hits", () => {
   assert.ok(directive("connect-src").includes("https://*.analytics.google.com"));
 });
 
+// Cloudflare injects this beacon at the edge for browser user agents, so it
+// is in no HTML file here and only a browser shows it. Without these two
+// sources the CSP blocks it and Web Analytics records nothing.
+test("Cloudflare Web Analytics may load its beacon and report", () => {
+  assert.ok(allows("script-src", "https://static.cloudflareinsights.com"));
+  assert.ok(allows("connect-src", "https://cloudflareinsights.com"));
+});
+
 test("plugins, <base>, and framing by other sites are blocked", () => {
   assert.deepEqual(directive("object-src"), ["'none'"]);
   assert.deepEqual(directive("base-uri"), ["'none'"]);
