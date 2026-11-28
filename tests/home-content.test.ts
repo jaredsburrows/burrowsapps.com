@@ -120,3 +120,57 @@ test("B3: index.md lists each technology group's chips, in order, under its ### 
     assert.deepEqual(items, [...chips], `index.md lists the wrong chips under "${group}"`);
   }
 });
+
+// C: structure.
+
+const HEADINGS_H2 = ["Mobile and web development services.", "Technologies I use.", "Let's talk."];
+
+const idsOf = (html: string): string[] => [...html.matchAll(/\sid="([^"]+)"/g)].map(([, id]) => id);
+
+test("C1: every id on the homepage is unique", async () => {
+  const ids = idsOf(await read("index.html"));
+  const repeated = ids.filter((id, index) => ids.indexOf(id) !== index);
+  assert.deepEqual(repeated, []);
+});
+
+test("C2: every in-page link names an id, and each section is linked", async () => {
+  const html = await read("index.html");
+  const ids = new Set(idsOf(html));
+  const targets = [...html.matchAll(/href="#([^"]*)"/g)].map(([, target]) => target);
+  for (const target of targets) assert.ok(ids.has(target), `href="#${target}" names no id`);
+  for (const section of ["services", "technologies", "contact"]) {
+    assert.ok(targets.includes(section), `nothing links to #${section}`);
+  }
+});
+
+test("C3: one <h1>, and the heading level never skips one going down", async () => {
+  const levels = [...(await read("index.html")).matchAll(/<h([1-6])\b/gi)].map(([, level]) => Number(level));
+  assert.equal(levels.filter((level) => level === 1).length, 1);
+  assert.equal(levels[0], 1, "the first heading is not the <h1>");
+  for (const [index, level] of levels.entries()) {
+    if (index === 0) continue;
+    assert.ok(level <= levels[index - 1] + 1, `heading ${index + 1} jumps from h${levels[index - 1]} to h${level}`);
+  }
+});
+
+test("C4: every <section> is labeled by an <h2> inside it", async () => {
+  const html = await read("index.html");
+  const sections = [...html.matchAll(/<section\b([^>]*)>([\s\S]*?)<\/section>/gi)];
+  assert.ok(sections.length > 0);
+  for (const [, attributes, inner] of sections) {
+    const label = attributes.match(/aria-labelledby="([^"]+)"/);
+    assert.ok(label, `a section has no aria-labelledby: ${attributes.trim()}`);
+    assert.match(inner, new RegExp(`<h2 id="${label[1]}"`), `no <h2 id="${label[1]}"> inside its section`);
+  }
+});
+
+test("C5: the sections are services, technologies, then contact", async () => {
+  const order = [...(await read("index.html")).matchAll(/<section id="([^"]+)"/g)].map(([, id]) => id);
+  assert.deepEqual(order, ["services", "technologies", "contact"]);
+});
+
+test("C6: the three <h2> texts are the approved ones, and there are nine <h3>", async () => {
+  const html = await read("index.html");
+  assert.deepEqual(elements(html, "h2").map(textOf), HEADINGS_H2);
+  assert.equal(elements(html, "h3").length, 9);
+});
