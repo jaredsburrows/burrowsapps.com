@@ -174,3 +174,33 @@ test("C6: the three <h2> texts are the approved ones, and there are nine <h3>", 
   assert.deepEqual(elements(html, "h2").map(textOf), HEADINGS_H2);
   assert.equal(elements(html, "h3").length, 9);
 });
+
+// D: styles.
+
+const PAGES = ["index.html", "privacy.html", "404.html"] as const;
+
+test("D1: home.css loads nothing and animates nothing", async () => {
+  const css = await read("static/css/home.css");
+  for (const banned of ["@import", "url(", "@keyframes", "animation"]) {
+    assert.ok(!css.includes(banned), `home.css contains ${banned}`);
+  }
+});
+
+// Classes that are hooks for something other than this stylesheet.
+const UNSTYLED_CLASSES: Readonly<Record<string, string>> = {
+  "cf-turnstile": "Turnstile's script finds its widget by this class and styles it itself",
+};
+
+test("D2: every class used on the three pages has a selector in home.css", async () => {
+  const css = await read("static/css/home.css");
+  const used = new Set<string>();
+  for (const page of PAGES) {
+    for (const [, value] of (await read(page)).matchAll(/\sclass="([^"]+)"/g)) {
+      for (const name of value.split(/\s+/)) if (name !== "") used.add(name);
+    }
+  }
+  const missing = [...used].filter(
+    (name) => !(name in UNSTYLED_CLASSES) && !new RegExp(`\\.${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`).test(css),
+  );
+  assert.deepEqual(missing, [], `classes with no selector in home.css: ${missing.join(", ")}`);
+});

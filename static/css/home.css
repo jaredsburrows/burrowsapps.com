@@ -365,6 +365,61 @@ a { color: inherit; }
   padding: 13px 26px;
 }
 
+/* ============ Technologies ============ */
+
+.tech {
+  padding: clamp(56px, 8vw, 84px) clamp(20px, 4.5vw, 56px);
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+@media (max-width: 880px) {
+  .tech-grid { grid-template-columns: 1fr; }
+}
+
+.tech-groups { min-width: 0; }
+
+.tech-group + .tech-group {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+/* Written in sentence case in the HTML; capitals are a style. */
+.tech-group h3 {
+  margin: 0;
+  font-family: var(--mono), monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* role="list" in the HTML keeps list semantics that list-style: none removes in WebKit. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chips li {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
 /* ============ Contact ============ */
 
 .contact {
