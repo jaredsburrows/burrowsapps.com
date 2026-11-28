@@ -13,6 +13,13 @@ const read = async (path: string): Promise<string> => readFile(new URL(path, REP
 const elements = (html: string, tag: string): string[] =>
   [...html.matchAll(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi"))].map(([, inner]) => inner);
 
+// Every string inside a parsed JSON value.
+const strings = (value: unknown): string[] => {
+  if (typeof value === "string") return [value];
+  if (value && typeof value === "object") return Object.values(value).flatMap(strings);
+  return [];
+};
+
 // Non-blank lines of a markdown file.
 const markdownLines = async (path: string): Promise<string[]> =>
   (await read(path)).split("\n").filter((line) => line.trim() !== "");
@@ -331,4 +338,102 @@ test("E6: the structured-data description is the hero lede, which is unchanged",
 test("E7: the privacy and 404 pages keep their titles", async () => {
   assert.equal(titleOf(await read("privacy.html")), "Privacy Policy | Burrows Applications");
   assert.equal(titleOf(await read("404.html")), "404 | Burrows Applications");
+});
+
+// G: guards for the constraints on this page.
+
+const GTAG = "https://www.googletagmanager.com/gtag/js?id=G-D66SZ7FMWX";
+const TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+const ALLOWED_HOSTS = ["www.googletagmanager.com", "challenges.cloudflare.com"];
+
+const scriptSources = (html: string): string[] =>
+  [...html.matchAll(/<script\b[^>]*\ssrc="([^"]+)"/gi)].map(([, src]) => src);
+
+test("G1: the pages load only the expected scripts, in order", async () => {
+  assert.deepEqual(scriptSources(await read("index.html")), [GTAG, TURNSTILE, "/static/js/home.js"]);
+  assert.deepEqual(scriptSources(await read("privacy.html")), [GTAG]);
+  assert.deepEqual(scriptSources(await read("404.html")), [GTAG]);
+});
+
+const isAllowedResource = (url: string): boolean =>
+  (url.startsWith("/") && !url.startsWith("//")) || (url.startsWith("https://") && ALLOWED_HOSTS.includes(new URL(url).hostname));
+
+test("G2: every loaded resource is same-origin or on an allowed host, and the homepage links out only to LinkedIn and X", async () => {
+  for (const page of PAGES) {
+    const html = await read(page);
+    const sources = [...html.matchAll(/\ssrc="([^"]+)"/gi)].map(([, src]) => src);
+    const links = [...html.matchAll(/<link\b[^>]*>/gi)]
+      .map(([tag]) => tag)
+      .filter((tag) => /\srel="(?:stylesheet|icon|apple-touch-icon)"/.test(tag))
+      .map((tag) => (tag.match(/\shref="([^"]+)"/) ?? ["", ""])[1]);
+    for (const url of [...sources, ...links]) assert.ok(isAllowedResource(url), `${page} loads ${url}`);
+  }
+  const outbound = [...(await read("index.html")).matchAll(/<a\b[^>]*\shref="(https:\/\/[^"]+)"/gi)].map(([, href]) => href);
+  assert.ok(outbound.length > 0);
+  for (const href of outbound) {
+    assert.ok(["linkedin.com", "x.com"].includes(new URL(href).hostname), `index.html links out to ${href}`);
+  }
+});
+
+test("G3: no images, media, inline styles, or quotations; the only iframe is the one in <noscript>", async () => {
+  for (const page of PAGES) {
+    const html = await read(page);
+    const found = [...html.matchAll(/<(img|picture|video|svg|style|blockquote|q)\b/gi)].map(([, tag]) => tag);
+    assert.deepEqual(found, [], `${page} has ${found.join(", ")}`);
+    const iframes = (html.match(/<iframe\b/gi) ?? []).length;
+    const inNoscript = (html.match(/<noscript><iframe\b/gi) ?? []).length;
+    assert.equal(iframes, inNoscript, `${page} has an iframe outside <noscript>`);
+  }
+});
+
+const pageTexts = async (): Promise<{ label: string; text: string }[]> => [
+  { label: "the <main> of index.html", text: textOf(mainOf(await read("index.html"))) },
+  { label: "index.md", text: await read("index.md") },
+];
+
+const CLAIMS: readonly RegExp[] = [
+  /\d[+%]/,
+  /\d+x\b/i,
+  /\byears?\b/i,
+  /\bclients?\b/i,
+  /\bcustomers?\b/i,
+  /\btestimonials?\b/i,
+  /\btrusted by\b/i,
+  /\bawards?\b/i,
+  /certif/i,
+  /guarantee/i,
+  /\bbest\b/i,
+  /\bworld-class\b/i,
+  /#1\b/,
+];
+
+test("G4: the homepage makes no numeric claim, names no client, and boasts of nothing", async () => {
+  for (const { label, text } of await pageTexts()) {
+    for (const claim of CLAIMS) assert.doesNotMatch(text, claim, `${label} matches ${claim}`);
+  }
+});
+
+const BRITISH = ["modernis", "organis", "optimis", "specialis", "behaviour", "colour", "centre", "licence"];
+
+test("G5: the homepage is written in American English", async () => {
+  for (const { label, text } of await pageTexts()) {
+    for (const spelling of BRITISH) assert.ok(!text.toLowerCase().includes(spelling), `${label} has "${spelling}"`);
+  }
+});
+
+const VENDORS = ["cloudflare", "fastly", "github", "gradle", "koin"];
+
+test("G6: no host or CI vendor is named in the homepage text, its head, or its structured data", async () => {
+  const html = await read("index.html");
+  const texts = [
+    ...(await pageTexts()),
+    { label: "the title", text: titleOf(html) },
+    { label: "the meta description", text: metaContent(html, "name", "description") },
+    { label: "og:description", text: metaContent(html, "property", "og:description") },
+    { label: "twitter:description", text: metaContent(html, "name", "twitter:description") },
+    ...strings(structuredData(html)).map((text) => ({ label: "the structured data", text })),
+  ];
+  for (const { label, text } of texts) {
+    for (const vendor of VENDORS) assert.ok(!text.toLowerCase().includes(vendor), `${label} names ${vendor}: "${text}"`);
+  }
 });
