@@ -66,6 +66,10 @@ The tests fail when any of these drift:
 
 - Edit `.well-known/ai-catalog.json`: copy it over `.well-known/ard.json` (`cp .well-known/ai-catalog.json .well-known/ard.json`).
 - Add anything that reads a credential or answers `401`: the OAuth documents and `auth.md` are then wrong, and a test says so.
+- Edit a service: change it in `workers/agent-readiness/facts.ts`, in its card in `index.html`, in `index.md`, and in the `hasOfferCatalog` block in `index.html`; a changed name also in the list in `SKILL.md` (then recompute the digest). The tests fail until all of them agree.
+- Add or remove a technology: change the chip in `index.html`, the list in `index.md`, `knowsAbout` in the structured data, and the approved list in `tests/home-content.test.ts`.
+- Change the homepage title or search description: change all three copies in `<head>` (the tag itself, the Open Graph one, the Twitter one) and the constant in `tests/home-content.test.ts`.
+- Change `static/css/home.css`: raise the number in `?v=` on the stylesheet link in `index.html`, `privacy.html`, and `404.html`. Browsers keep the stylesheet for an hour.
 
 #### Running the tests
 
