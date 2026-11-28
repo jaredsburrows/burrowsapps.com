@@ -213,6 +213,12 @@ for (const [text, skillId] of [
   ["I want to reach more users with my app", "services"],
   ["Can I reach you about a project?", "contact-options"],
   ["How do I get in touch?", "contact-options"],
+  ["Do you do security reviews?", "services"],
+  ["Can you migrate our app?", "services"],
+  ["We need to modernize a legacy codebase", "services"],
+  ["Is Java to Kotlin something you do?", "services"],
+  ["Do you write Swift?", "services"],
+  ["Can you port it over?", "services"],
 ] as const) {
   test(`SendMessage: "${text}" routes to ${skillId}`, async () => {
     const message = await expectMessage(await send(say(text)));

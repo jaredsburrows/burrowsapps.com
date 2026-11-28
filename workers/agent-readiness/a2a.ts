@@ -36,9 +36,9 @@ export const SKILLS: readonly Skill[] = [
   {
     id: "services",
     name: "Services",
-    description: "The kinds of software Burrows Applications builds: native Android and iOS apps, Kotlin Multiplatform apps, and websites. Chosen when the message asks what the company builds or offers, or names a platform, or when metadata.skillId is services. The reply is one text part and one JSON data part listing the services.",
-    tags: ["services", "android", "ios", "kotlin-multiplatform", "websites"],
-    examples: ["What does Burrows Applications build?", "Do you build Kotlin Multiplatform apps?"],
+    description: "What Burrows Applications offers: native Android and iOS apps, iOS and Android migration, Kotlin Multiplatform, Java to Kotlin modernization, security analysis, and websites built from scratch. Chosen when the message asks what the company builds or offers, or names a platform or one of these services, or when metadata.skillId is services. The reply is one text part and one JSON data part listing the services.",
+    tags: ["services", "android", "ios", "kotlin-multiplatform", "migration", "websites", "security", "modernization"],
+    examples: ["What does Burrows Applications build?", "Do you build Kotlin Multiplatform apps?", "Can you migrate a Java app to Kotlin?"],
     inputModes: ["text/plain"],
     outputModes: MODES,
   },
@@ -55,7 +55,7 @@ export const SKILLS: readonly Skill[] = [
 
 export const AGENT_CARD: Record<string, unknown> = {
   name: "Burrows Applications",
-  description: "Read-only facts about Burrows Applications, a software company that builds native Android and iOS apps, Kotlin Multiplatform apps, and websites. Replies are fixed company data chosen by simple rules, not generated text. This agent cannot send a message, book work, or store anything you send. Anonymous; no login.",
+  description: "Read-only facts about Burrows Applications, a software company that offers native Android and iOS apps, iOS and Android migration, Kotlin Multiplatform, Java to Kotlin modernization, security analysis, and websites built from scratch. Replies are fixed company data chosen by simple rules, not generated text. This agent cannot send a message, book work, or store anything you send. Anonymous; no login.",
   supportedInterfaces: [{ url: ENDPOINT_URL, protocolBinding: "JSONRPC", protocolVersion: A2A_VERSION }],
   provider: { organization: "Burrows Applications", url: "https://burrowsapps.com/" },
   iconUrl: "https://burrowsapps.com/static/img/apple-touch-icon.png",
@@ -77,7 +77,7 @@ export const ANSWERS: Readonly<Record<string, () => Answer>> = {
     data: { ...COMPANY },
   }),
   services: () => ({
-    text: [`${COMPANY.name} builds:`, ...SERVICES.map(({ name, description }) => `- ${name}: ${description}`)].join("\n"),
+    text: [`${COMPANY.name} offers:`, ...SERVICES.map(({ name, description }) => `- ${name}: ${description}`)].join("\n"),
     data: { services: SERVICES },
   }),
   "contact-options": () => {
@@ -200,7 +200,7 @@ const CONTEXT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 // get in touch.
 const KEYWORDS: readonly (readonly [string, RegExp])[] = [
   ["contact-options", /\b(contact|email|e-mail|get in touch|in touch with|reach (you|out|burrows)|hire|inquiry|inquire|quote)\b/],
-  ["services", /\b(services?|builds?|building|offers?|platforms?|android|ios|kotlin|multiplatform|kmp|websites?|apps?|makes?|making|develops?|developing)\b/],
+  ["services", /\b(services?|builds?|building|offers?|platforms?|android|ios|kotlin|multiplatform|kmp|websites?|apps?|makes?|making|develops?|developing|security|migrat(?:e|es|ed|ing|ion|ions)|moderniz(?:e|es|ed|ing|ation)|legacy|java|swift|port(?:ing)?)\b/],
   ["company-profile", /\b(who|about|company|profile|founder|founded|what is|what's|whats|what do you do|what does it do)\b/],
 ];
 
