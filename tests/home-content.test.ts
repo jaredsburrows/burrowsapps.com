@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { SERVICES } from "../workers/agent-readiness/facts.ts";
 import { mainOf, textOf } from "./support/html-text.ts";
+import { isPublished, site } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
 const read = async (path: string): Promise<string> => readFile(new URL(path, REPO), "utf8");
@@ -203,4 +204,43 @@ test("D2: every class used on the three pages has a selector in home.css", async
     (name) => !(name in UNSTYLED_CLASSES) && !new RegExp(`\\.${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`).test(css),
   );
   assert.deepEqual(missing, [], `classes with no selector in home.css: ${missing.join(", ")}`);
+});
+
+// F: the other pages.
+
+const stylesheets = (html: string): string[] =>
+  [...html.matchAll(/<link\b[^>]*rel="stylesheet"[^>]*>/gi)].map(([tag]) => {
+    const href = tag.match(/href="([^"]+)"/);
+    assert.ok(href, `a stylesheet link has no href: ${tag}`);
+    return href[1];
+  });
+
+test("F1: the three pages share one versioned stylesheet link to a published file", async () => {
+  const links = await Promise.all(PAGES.map(async (page) => stylesheets(await read(page))));
+  for (const [index, page] of PAGES.entries()) assert.equal(links[index].length, 1, `${page} needs exactly one stylesheet`);
+  const [href] = links[0];
+  for (const [index, page] of PAGES.entries()) assert.equal(links[index][0], href, `${page} links a different stylesheet`);
+  assert.match(href, /^\/static\/css\/home\.css\?v=\d+$/);
+  assert.ok(isPublished(href.slice(1).split("?")[0]), `${href} is not a published file`);
+});
+
+test("F2: the section links on the privacy and 404 pages name ids on the homepage", async () => {
+  const ids = new Set(idsOf(await read("index.html")));
+  for (const page of ["privacy.html", "404.html"]) {
+    const targets = [...(await read(page)).matchAll(/href="\/#([^"]*)"/g)].map(([, target]) => target);
+    for (const target of targets) assert.ok(ids.has(target), `${page} links /#${target}, which names no id`);
+    for (const section of ["services", "technologies"]) {
+      assert.ok(targets.includes(section), `${page} does not link /#${section}`);
+    }
+  }
+});
+
+// States the assumption that the asset router serves a file with a query
+// string as the file; the local preview measures it.
+test("F3: the versioned stylesheet URL is served as the stylesheet", async () => {
+  const [href] = stylesheets(await read("index.html"));
+  const response = await site(new Request(`https://burrowsapps.com${href}`));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Content-Type"), "text/css; charset=utf-8");
+  assert.equal(response.headers.get("Cache-Control"), "public, max-age=3600");
 });
