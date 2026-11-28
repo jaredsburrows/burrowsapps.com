@@ -57,3 +57,66 @@ test("A3: index.md lists each service as a ### heading followed by its descripti
     assert.equal(lineAfter(lines, `### ${name}`), description, `the description of "${name}" in index.md differs`);
   }
 });
+
+// B: technologies. The owner's list (2026-11-27). A change here is a change in
+// four places: the chips in index.html, index.md, knowsAbout, and this list.
+
+const TECHNOLOGIES: readonly { group: string; chips: readonly string[] }[] = [
+  { group: "Mobile", chips: ["Kotlin", "Jetpack Compose", "Swift", "SwiftUI"] },
+  { group: "Cross-platform", chips: ["Kotlin Multiplatform", "Compose Multiplatform", "Ktor", "SQLDelight"] },
+  { group: "Web", chips: ["TypeScript", "HTML and CSS"] },
+];
+
+const sectionOf = (html: string, id: string): string => {
+  const match = html.match(new RegExp(`<section id="${id}"[^>]*>([\\s\\S]*?)<\\/section>`));
+  assert.ok(match, `no <section id="${id}">`);
+  return match[1];
+};
+
+// Each technology group as its heading and its chips, in page order.
+const techGroups = (html: string): { group: string; chips: string[]; lists: string[] }[] =>
+  sectionOf(html, "technologies")
+    .split(/<div class="tech-group">/)
+    .slice(1)
+    .map((part) => {
+      const headings = elements(part, "h3").map(textOf);
+      assert.equal(headings.length, 1, "a technology group needs exactly one <h3>");
+      return {
+        group: headings[0],
+        chips: elements(part, "li").map(textOf),
+        lists: [...part.matchAll(/<ul\b[^>]*>/gi)].map(([tag]) => tag),
+      };
+    });
+
+test("B1: the technology groups and their chips are the approved list, in order", async () => {
+  const groups = techGroups(await read("index.html"));
+  for (const { group, lists } of groups) {
+    assert.deepEqual(lists, ['<ul class="chips" role="list">'], `the group "${group}" needs exactly one chip list`);
+  }
+  assert.deepEqual(
+    groups.map(({ group, chips }) => ({ group, chips })),
+    TECHNOLOGIES.map(({ group, chips }) => ({ group, chips: [...chips] })),
+  );
+});
+
+test("B2: chip texts are unique across the page, and so are group names", async () => {
+  const groups = techGroups(await read("index.html"));
+  const chips = groups.flatMap(({ chips }) => chips);
+  assert.equal(new Set(chips).size, chips.length, "a chip appears twice");
+  const names = groups.map(({ group }) => group);
+  assert.equal(new Set(names).size, names.length, "a group name appears twice");
+});
+
+test("B3: index.md lists each technology group's chips, in order, under its ### heading", async () => {
+  const lines = await markdownLines("index.md");
+  for (const { group, chips } of TECHNOLOGIES) {
+    const index = lines.indexOf(`### ${group}`);
+    assert.ok(index >= 0, `index.md has no "### ${group}"`);
+    const items: string[] = [];
+    for (const line of lines.slice(index + 1)) {
+      if (!line.startsWith("- ")) break;
+      items.push(line.slice(2));
+    }
+    assert.deepEqual(items, [...chips], `index.md lists the wrong chips under "${group}"`);
+  }
+});

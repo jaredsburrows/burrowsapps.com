@@ -36,6 +36,29 @@ Bring an aging codebase up to date: Java to Kotlin, outdated libraries and build
 
 Not sure which one fits? Describe what you have and where it needs to go.
 
+## Technologies I use.
+
+The languages, frameworks, and tools used most. If yours is not listed, ask.
+
+### Mobile
+
+- Kotlin
+- Jetpack Compose
+- Swift
+- SwiftUI
+
+### Cross-platform
+
+- Kotlin Multiplatform
+- Compose Multiplatform
+- Ktor
+- SQLDelight
+
+### Web
+
+- TypeScript
+- HTML and CSS
+
 ## Let's talk.
 
 Tell me about your project — app, tooling, or something in between. Messages go straight to my inbox.
