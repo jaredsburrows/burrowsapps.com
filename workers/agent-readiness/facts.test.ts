@@ -56,3 +56,41 @@ test("the form limits equal the contact Worker's", async () => {
 test("contactOptions is the contact facts and nothing else", async () => {
   assert.deepEqual(contactOptions(), { ...CONTACT });
 });
+
+test("there are six services", async () => {
+  assert.equal(SERVICES.length, 6);
+});
+
+test("service ids are unique and kebab-case", async () => {
+  const ids = SERVICES.map(({ id }) => id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const id of ids) assert.match(id, /^[a-z]+(?:-[a-z]+)*$/, `${id} is not kebab-case`);
+});
+
+test("the original three service ids are still present", async () => {
+  const ids: readonly string[] = SERVICES.map(({ id }) => id);
+  for (const id of ["native-mobile", "kotlin-multiplatform", "web"]) assert.ok(ids.includes(id), `${id} is missing`);
+});
+
+test("every service has a name and a description", async () => {
+  for (const { id, name, description } of SERVICES) {
+    assert.ok(name.trim() !== "", `${id} has no name`);
+    assert.ok(description.trim() !== "", `${id} has no description`);
+  }
+});
+
+// The same sentence is shown on the page and returned by the API, so it must
+// read correctly in both: a period at the end, short, and no person speaking.
+test("every service description is one short impersonal sentence", async () => {
+  for (const { id, description } of SERVICES) {
+    assert.ok(description.endsWith("."), `${id}: the description does not end with a period`);
+    assert.ok(description.length <= 200, `${id}: the description is ${description.length} characters`);
+    assert.doesNotMatch(description, /\b(?:you|your|we|our)\b/i, `${id}: the description addresses someone`);
+    assert.doesNotMatch(description, /\bI\b/, `${id}: the description says "I"`);
+  }
+});
+
+test("every service name is a list item in SKILL.md", async () => {
+  const lines = (await read(".well-known/agent-skills/contact-burrows-applications/SKILL.md")).split("\n");
+  for (const { name } of SERVICES) assert.ok(lines.includes(`- ${name}`), `SKILL.md does not list "${name}"`);
+});

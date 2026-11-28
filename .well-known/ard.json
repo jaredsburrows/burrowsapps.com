@@ -8,13 +8,15 @@
     {
       "identifier": "urn:air:burrowsapps.com:skill:contact-burrows-applications",
       "displayName": "Contact Burrows Applications",
-      "description": "Agent Skill that explains what Burrows Applications builds (native Android and iOS apps, Kotlin Multiplatform, and websites) and how to send the company a project inquiry.",
+      "description": "Agent Skill that explains what Burrows Applications offers (native Android and iOS apps, iOS and Android migration, Kotlin Multiplatform, Java to Kotlin modernization, security analysis, and websites built from scratch) and how to send the company a project inquiry.",
       "type": "application/agent-skills+md",
       "url": "https://burrowsapps.com/.well-known/agent-skills/contact-burrows-applications/SKILL.md",
       "representativeQueries": [
         "how do I contact Burrows Applications about building a mobile app",
         "who can build a Kotlin Multiplatform app for Android and iOS",
-        "send a project inquiry to Burrows Applications"
+        "send a project inquiry to Burrows Applications",
+        "who can port an Android app to iOS or an iOS app to Android",
+        "who can migrate a Java codebase to Kotlin"
       ]
     },
     {

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { collapse, decodeEntities, mainOf, stripTags } from "./support/html-text.ts";
 
 const REPO = new URL("../", import.meta.url);
 
@@ -48,41 +49,12 @@ const PAIRS: readonly Pair[] = [
   },
 ];
 
-const ENTITIES: Readonly<Record<string, string>> = {
-  "&amp;": "&",
-  "&nbsp;": " ",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": '"',
-  "&#39;": "'",
-};
-
-const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
 const normalize = (text: string): string => collapse(text).toLowerCase();
-
-// Loops until stable so that removing one tag can never leave another behind.
-const stripTags = (html: string): string => {
-  let previous: string;
-  let current = html;
-  do {
-    previous = current;
-    current = previous.replace(/<[^>]+>/g, "");
-  } while (current !== previous);
-  return current;
-};
-
-const mainOf = (html: string): string => {
-  const match = html.match(/<main\b[^>]*>([\s\S]*)<\/main>/i);
-  assert.ok(match, "no <main> element");
-  return match[1];
-};
 
 // Headings, paragraphs, and list items, as plain text with case kept.
 const htmlBlockText = (main: string): string[] =>
-  [...main.matchAll(/<(h1|h2|p|li)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
-    .map(([, , inner]) =>
-      collapse(stripTags(inner).replace(/&(amp|nbsp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity])),
-    )
+  [...main.matchAll(/<(h1|h2|h3|p|li)\b[^>]*>([\s\S]*?)<\/\1>/gi)]
+    .map(([, , inner]) => collapse(decodeEntities(stripTags(inner))))
     .filter((block) => block !== "");
 
 const htmlBlocks = (main: string): string[] => htmlBlockText(main).map(normalize);
