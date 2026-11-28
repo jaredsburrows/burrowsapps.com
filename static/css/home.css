@@ -167,8 +167,8 @@ a { color: inherit; }
 
 /* A 44px hit area for the section links; the negative margin keeps the bar's height. */
 .nav-links .nav-section {
-  padding-block: 13px;
-  margin-block: -13px;
+  padding-block: 14px;
+  margin-block: -14px;
 }
 
 /* In-page section links: wide screens only, so the phone nav keeps its two items. */
