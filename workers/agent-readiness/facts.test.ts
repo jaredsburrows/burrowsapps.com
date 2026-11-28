@@ -89,3 +89,8 @@ test("every service description is one short impersonal sentence", async () => {
     assert.doesNotMatch(description, /\bI\b/, `${id}: the description says "I"`);
   }
 });
+
+test("every service name is a list item in SKILL.md", async () => {
+  const lines = (await read(".well-known/agent-skills/contact-burrows-applications/SKILL.md")).split("\n");
+  for (const { name } of SERVICES) assert.ok(lines.includes(`- ${name}`), `SKILL.md does not list "${name}"`);
+});

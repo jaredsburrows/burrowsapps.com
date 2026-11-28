@@ -1,6 +1,6 @@
 ---
 name: contact-burrows-applications
-description: Explains what Burrows Applications builds (native Android and iOS apps, Kotlin Multiplatform, and websites) and how to send the company a project inquiry. Use when someone wants to hire, contact, or learn about Burrows Applications.
+description: Explains what Burrows Applications offers (native Android and iOS apps, iOS and Android migration, Kotlin Multiplatform, Java to Kotlin modernization, security analysis, and websites built from scratch) and how to send the company a project inquiry. Use when someone wants to hire, contact, or learn about Burrows Applications.
 ---
 
 # Contact Burrows Applications
@@ -9,9 +9,12 @@ description: Explains what Burrows Applications builds (native Android and iOS a
 
 Burrows Applications is a software development company founded by Jared Burrows. It specializes in mobile-first development:
 
-- Native apps for Android and iOS
-- Kotlin Multiplatform for cross-platform apps
-- Modern websites when a product needs a home on the web
+- iOS to Android and Android to iOS migration
+- Kotlin Multiplatform (KMP) development
+- Native Android and iOS apps
+- Custom websites built from scratch
+- Mobile app and website security analysis
+- Java to Kotlin migration and modernization
 
 Website: https://burrowsapps.com/
 
@@ -38,7 +41,7 @@ On https://burrowsapps.com/ the page registers a WebMCP tool named `send_contact
 ## What a useful message includes
 
 - Who is asking and how to reach them
-- What they want built (app, tooling, website) and for which platforms
+- What they need (a new app, a migration, a website, a security review, or a modernization) and for which platforms
 - Timeline and any constraints that matter
 
 ## Related
