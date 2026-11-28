@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { SERVICES } from "../workers/agent-readiness/facts.ts";
-import { mainOf, textOf } from "./support/html-text.ts";
+import { decodeEntities, mainOf, textOf } from "./support/html-text.ts";
 import { isPublished, site } from "./support/static-site.ts";
 
 const REPO = new URL("../", import.meta.url);
@@ -243,4 +243,92 @@ test("F3: the versioned stylesheet URL is served as the stylesheet", async () =>
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("Content-Type"), "text/css; charset=utf-8");
   assert.equal(response.headers.get("Cache-Control"), "public, max-age=3600");
+});
+
+// E: title, descriptions, and structured data. The title and the description
+// are the owner's wording (2026-11-27); the lede is the hero's, unchanged.
+
+const TITLE = "Burrows Applications | Android, iOS & Kotlin Multiplatform Apps";
+const DESCRIPTION =
+  "Native Android and iOS apps, iOS and Android migration, Kotlin Multiplatform, Java to Kotlin modernization, security analysis, and websites built from scratch.";
+const LEDE =
+  "Burrows Applications specializes in mobile-first development — native apps for Android and iOS, Kotlin Multiplatform for cross-platform, and modern websites when your product needs a home on the web.";
+
+const metaContent = (html: string, attribute: "name" | "property", key: string): string => {
+  const matches = [...html.matchAll(new RegExp(`<meta\\s+${attribute}="${key}"\\s+content="([^"]*)"`, "g"))];
+  assert.equal(matches.length, 1, `expected one <meta ${attribute}="${key}">`);
+  return decodeEntities(matches[0][1]);
+};
+
+const titleOf = (html: string): string => {
+  const titles = elements(html, "title");
+  assert.equal(titles.length, 1, "expected one <title>");
+  return textOf(titles[0]);
+};
+
+type StructuredData = {
+  description: string;
+  knowsAbout: string[];
+  hasOfferCatalog: { itemListElement: { "@type": string; itemOffered: { "@type": string; name: string; description: string } }[] };
+};
+
+const jsonLdBlocks = (html: string): string[] =>
+  [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(([, body]) => body);
+
+const structuredData = (html: string): StructuredData => {
+  const blocks = jsonLdBlocks(html);
+  assert.equal(blocks.length, 1, "expected one application/ld+json block");
+  return JSON.parse(blocks[0]);
+};
+
+test("E1: the homepage has one structured-data block, and it parses", async () => {
+  const blocks = jsonLdBlocks(await read("index.html"));
+  assert.equal(blocks.length, 1);
+  assert.doesNotThrow(() => JSON.parse(blocks[0]));
+});
+
+test("E2: the offer catalog lists SERVICES, in order", async () => {
+  const data = structuredData(await read("index.html"));
+  assert.deepEqual(
+    data.hasOfferCatalog.itemListElement,
+    SERVICES.map(({ name, description }) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name, description } })),
+  );
+});
+
+test("E3: knowsAbout has every chip, 18 entries, no duplicate, and none of the removed entries", async () => {
+  const { knowsAbout } = structuredData(await read("index.html"));
+  for (const chip of TECHNOLOGIES.flatMap(({ chips }) => chips)) {
+    assert.ok(knowsAbout.includes(chip), `knowsAbout is missing ${chip}`);
+  }
+  assert.equal(new Set(knowsAbout).size, knowsAbout.length, "knowsAbout has a duplicate");
+  assert.equal(knowsAbout.length, 18);
+  for (const removed of ["Java", "Android", "iOS", "Room", "Koin"]) {
+    assert.ok(!knowsAbout.includes(removed), `knowsAbout has ${removed}`);
+  }
+});
+
+test("E4: the title, og:title, and twitter:title are the approved title", async () => {
+  const html = await read("index.html");
+  assert.equal(titleOf(html), TITLE);
+  assert.equal(metaContent(html, "property", "og:title"), TITLE);
+  assert.equal(metaContent(html, "name", "twitter:title"), TITLE);
+});
+
+test("E5: the meta, Open Graph, and Twitter descriptions are the approved description", async () => {
+  const html = await read("index.html");
+  assert.equal(metaContent(html, "name", "description"), DESCRIPTION);
+  assert.equal(metaContent(html, "property", "og:description"), DESCRIPTION);
+  assert.equal(metaContent(html, "name", "twitter:description"), DESCRIPTION);
+});
+
+test("E6: the structured-data description is the hero lede, which is unchanged", async () => {
+  const html = await read("index.html");
+  const ledes = [...html.matchAll(/<p class="lede">([\s\S]*?)<\/p>/g)].map(([, inner]) => textOf(inner));
+  assert.deepEqual(ledes, [LEDE]);
+  assert.equal(structuredData(html).description, LEDE);
+});
+
+test("E7: the privacy and 404 pages keep their titles", async () => {
+  assert.equal(titleOf(await read("privacy.html")), "Privacy Policy | Burrows Applications");
+  assert.equal(titleOf(await read("404.html")), "404 | Burrows Applications");
 });
