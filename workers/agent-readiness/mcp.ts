@@ -12,7 +12,7 @@ export const MODERN_VERSION = "2026-07-28";
 // 2025-03-26 is not claimed: it allows JSON-RPC batches, which this server rejects.
 export const LEGACY_VERSIONS = ["2025-11-25", "2025-06-18"] as const;
 export const SUPPORTED_VERSIONS: readonly string[] = [MODERN_VERSION, ...LEGACY_VERSIONS];
-export const INSTRUCTIONS = "Read-only facts about Burrows Applications, a software company that builds native Android and iOS apps, Kotlin Multiplatform apps, and websites. Call get_contact_options to learn how to send an inquiry; this server cannot send one.";
+export const INSTRUCTIONS = "Read-only facts about Burrows Applications, a software company that offers native Android and iOS apps, iOS and Android migration, Kotlin Multiplatform, Java to Kotlin modernization, security analysis, and websites built from scratch. Call get_contact_options to learn how to send an inquiry; this server cannot send one.";
 
 const META_VERSION = "io.modelcontextprotocol/protocolVersion";
 const META_CAPABILITIES = "io.modelcontextprotocol/clientCapabilities";
@@ -43,7 +43,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: "list_services",
     title: "Services",
-    description: "The kinds of software Burrows Applications builds.",
+    description: "The services Burrows Applications offers.",
     inputSchema: NO_ARGUMENTS,
     annotations: READ_ONLY,
   },
